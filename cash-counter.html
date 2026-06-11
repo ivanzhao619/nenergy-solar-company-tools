@@ -12,6 +12,18 @@
 <link rel="manifest" href="manifest.json">
 <!-- iOS 主屏幕图标（SVG inline fallback，真实图标在 manifest） -->
 <link rel="apple-touch-icon" href="icon-192.png">
+<script>
+/* 阻止 iOS Safari 双击缩放和手势缩放 */
+document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
+document.addEventListener('gesturechange',function(e){e.preventDefault();},{passive:false});
+document.addEventListener('gestureend',function(e){e.preventDefault();},{passive:false});
+var _lastTap=0;
+document.addEventListener('touchend',function(e){
+  var now=Date.now();
+  if(now-_lastTap<350){e.preventDefault();}
+  _lastTap=now;
+},{passive:false});
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -20,6 +32,8 @@
   --text:#f0f2ff;--muted:#6b7099;
   --green:#2ecc71;--red:#e74c3c;--border:#2e3250;
   --tab-h:68px;
+  --tab-extra:16px;
+  --blue:#4a9eff;--blue-dim:#1a2e4a;
 }
 html,body{height:100%;overflow:hidden;background:var(--bg);}
 body{
@@ -27,29 +41,33 @@ body{
   font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   display:flex;flex-direction:column;
   -webkit-tap-highlight-color:transparent;user-select:none;
+  touch-action:manipulation;
 }
 
 /* ── TAB BAR ── */
 .tab-bar{
   position:fixed;bottom:0;left:0;right:0;
-  height:var(--tab-h);background:rgba(15,17,23,0.97);
+  height:calc(var(--tab-h) + var(--tab-extra));
+  background:rgba(15,17,23,0.97);
   backdrop-filter:blur(20px);border-top:1px solid var(--border);
-  display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);
+  display:flex;z-index:100;
+  padding-bottom:calc(env(safe-area-inset-bottom) + var(--tab-extra));
+  padding-top:4px;
 }
 .tab-btn{
   flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:3px;background:none;border:none;
-  color:var(--muted);font-size:10px;font-weight:600;letter-spacing:0.04em;
+  color:var(--muted);font-size:9px;font-weight:600;letter-spacing:0.03em;
   cursor:pointer;transition:color 0.15s;padding-top:6px;font-family:inherit;
 }
-.tab-btn svg{width:22px;height:22px;transition:transform 0.15s;}
+.tab-btn svg{width:20px;height:20px;transition:transform 0.15s;}
 .tab-btn.active{color:var(--accent);}
 .tab-btn.active svg{transform:scale(1.12);}
 
 /* ── PAGES ── */
 .page{
   display:none;flex-direction:column;
-  height:calc(100dvh - var(--tab-h));
+  height:calc(100dvh - var(--tab-h) - var(--tab-extra));
   overflow:hidden;background:var(--bg);
 }
 .page.active{display:flex;}
@@ -80,9 +98,9 @@ body{
 .tb-actions{display:flex;gap:7px;margin-top:10px;}
 .tb-btn{flex:1;border:none;border-radius:10px;padding:8px 4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity 0.1s;}
 .tb-btn:active{opacity:0.72;}
-.tb-btn-send{background:rgba(0,0,0,0.2);color:#1a0f00;}
+.tb-btn-send{background:rgba(0,0,0,0.12);color:#1a0f00;}
 .tb-btn-detail{background:rgba(0,0,0,0.12);color:#1a0f00;}
-.tb-btn-reset{background:rgba(0,0,0,0.1);color:rgba(0,0,0,0.45);}
+.tb-btn-reset{background:rgba(0,0,0,0.12);color:#1a0f00;}
 
 /* 面值列表紧凑：小section-label + 小gap + 小内边距 */
 .section-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:10px 18px 6px;}
@@ -235,7 +253,6 @@ body{
 .key-op{background:#252038;color:#c0a0ff;}
 .key-fn{background:#20222e;color:var(--muted);font-size:14px;}
 .key-eq{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#1a0f00;}
-.key-zero{grid-column:span 2;justify-content:flex-start;padding-left:20px;}
 .key-del{font-size:17px;}
 
 /* ══ TAB 3 · 钱仓 ══ */
@@ -307,9 +324,224 @@ body{
 .ve-plus{color:var(--green);}
 .ve-minus{color:var(--red);}
 
-/* TOAST */
+/* ══ TAB 4 · 流水账 ══ */
+#page-ledger{background:var(--bg);}
+
+/* 币种切换 */
+.ledger-currency-tabs{
+  display:flex;margin:14px 13px 0;gap:8px;
+}
+.lct-btn{
+  flex:1;padding:10px 0;border:1.5px solid var(--border);border-radius:12px;
+  background:var(--card);color:var(--muted);font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:all 0.15s;
+}
+.lct-btn.active-zmw{background:linear-gradient(135deg,#1a2e1a,#222e18);color:#a8d890;border-color:#3a5a2a;}
+.lct-btn.active-usd{background:linear-gradient(135deg,#1a2340,#222a45);color:#a8c8ff;border-color:#2e3e7a;}
+
+/* 日期导航 */
+.ledger-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  margin:10px 13px 0;background:var(--card);border-radius:14px;
+  border:1.5px solid var(--border);padding:10px 12px;
+}
+.lnav-arrow{
+  width:36px;height:36px;border:none;background:var(--surface);
+  border-radius:9px;color:var(--text);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-family:inherit;flex-shrink:0;transition:background 0.1s;
+}
+.lnav-arrow:active{background:var(--border);}
+.lnav-arrow:disabled{opacity:0.25;cursor:default;}
+.lnav-center{flex:1;text-align:center;cursor:pointer;}
+.lnav-date{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.3px;}
+.lnav-today-badge{
+  display:inline-block;background:var(--accent);color:#1a0f00;
+  font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;
+  margin-left:6px;vertical-align:middle;letter-spacing:0.05em;
+}
+.lnav-today-btn{
+  display:none;background:none;border:1.5px solid var(--border);
+  color:var(--muted);font-size:11px;font-weight:600;padding:4px 10px;
+  border-radius:8px;cursor:pointer;font-family:inherit;margin-top:4px;
+}
+.lnav-today-btn.show{display:inline-block;}
+
+/* 结余预览卡 */
+.ledger-net-card{
+  margin:8px 13px 0;border-radius:14px;padding:12px 16px;
+  display:flex;justify-content:space-between;align-items:center;
+  border:1.5px solid var(--border);
+}
+.ledger-net-card.zmw{background:linear-gradient(135deg,#1a2e1a,#222e18);border-color:#3a5a2a;}
+.ledger-net-card.usd{background:linear-gradient(135deg,#1a2340,#222a45);border-color:#2e3e7a;}
+.lnc-left{}
+.lnc-label{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;margin-bottom:2px;}
+.ledger-net-card.zmw .lnc-label{color:rgba(168,216,144,0.5);}
+.ledger-net-card.usd .lnc-label{color:rgba(168,200,255,0.5);}
+.lnc-formula{font-size:10px;color:var(--muted);margin-top:2px;}
+.lnc-val{font-size:26px;font-weight:900;letter-spacing:-0.5px;}
+.lnc-val.zmw-pos{color:#a8d890;}
+.lnc-val.zmw-neg{color:var(--red);}
+.lnc-val.usd-pos{color:#a8c8ff;}
+.lnc-val.usd-neg{color:var(--red);}
+
+/* 录入表单 */
+.ledger-form{margin:8px 13px 0;background:var(--card);border-radius:14px;border:1.5px solid var(--border);overflow:hidden;}
+.ledger-form-row{border-bottom:1px solid var(--border);}
+.ledger-form-row:last-child{border-bottom:none;}
+.lfr-main{display:flex;align-items:center;padding:0;}
+.lfr-label{
+  flex-shrink:0;width:88px;padding:12px 10px;
+  font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.02em;line-height:1.3;
+}
+.lfr-label.income{color:#7ec880;}
+.lfr-label.extra{color:var(--accent);}
+.lfr-label.expense{color:#e87070;}
+.lfr-label.carry{color:#7ab0e8;}
+.lfr-prefix{flex-shrink:0;color:var(--muted);font-size:13px;font-weight:600;padding-left:2px;}
+.lfr-input{
+  flex:1;background:transparent;border:none;
+  color:var(--text);font-size:17px;font-weight:700;
+  padding:12px 8px 12px 4px;outline:none;font-family:inherit;
+  -webkit-appearance:none;appearance:none;min-width:0;
+}
+.lfr-input::-webkit-outer-spin-button,.lfr-input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.lfr-input[type=number]{-moz-appearance:textfield;}
+.lfr-input::placeholder{color:var(--border);font-weight:400;font-size:14px;}
+.lfr-note-inline{
+  padding:0 10px 10px 88px;
+}
+.lfr-note-input{
+  width:100%;background:transparent;border:none;border-top:1px solid var(--border);
+  color:var(--muted);font-size:13px;font-weight:400;
+  padding:7px 4px 0;outline:none;font-family:inherit;
+}
+.lfr-note-input:focus{color:var(--text);}
+.lfr-note-input::placeholder{color:var(--border);}
+
+/* 昨日结余行特殊 — 显示来源提示 */
+.carry-source{font-size:9px;color:var(--muted);padding:0 10px 8px 88px;display:none;}
+.carry-source.show{display:block;}
+
+.ledger-commit-btn{
+  margin:8px 13px 4px;width:calc(100% - 26px);
+  border:none;border-radius:12px;padding:13px;
+  font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:opacity 0.1s;
+}
+.ledger-commit-btn.zmw{background:linear-gradient(135deg,#2a5a2a,#3a7a3a);color:#c8f5a0;}
+.ledger-commit-btn.usd{background:linear-gradient(135deg,#1a4a8a,#2a6acc);color:#c8e0ff;}
+.ledger-commit-btn:active{opacity:0.78;}
+
+/* 历史 */
+.ledger-history{padding:10px 13px 10px;}
+.ledger-history-title{
+  font-size:10px;letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;margin-bottom:8px;
+}
+.ledger-day-card{
+  background:var(--card);border-radius:13px;border:1px solid var(--border);
+  margin-bottom:8px;overflow:hidden;
+}
+.ldc-head{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 13px;cursor:pointer;
+}
+.ldc-head-date{font-size:13px;font-weight:700;color:var(--text);}
+.ldc-head-right{display:flex;align-items:center;gap:8px;}
+.ldc-head-net{font-size:15px;font-weight:800;}
+.ldc-head-net.pos{color:var(--green);}
+.ldc-head-net.pos-usd{color:#7ab0e8;}
+.ldc-head-net.neg{color:var(--red);}
+.ldc-chevron{color:var(--muted);font-size:11px;transition:transform 0.2s;}
+.ldc-body{padding:0 13px 12px;display:none;}
+.ldc-body.open{display:block;}
+.ldc-divider{height:1px;background:var(--border);margin-bottom:10px;}
+.ldc-body-row{display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0;font-size:13px;}
+.ldb-label{color:var(--muted);flex-shrink:0;}
+.ldb-right{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+.ldb-val{font-weight:700;text-align:right;}
+.ldb-val.inc{color:var(--green);}
+.ldb-val.exp{color:var(--red);}
+.ldb-val.ext{color:var(--accent);}
+.ldb-val.carry{color:var(--blue);}
+.ldb-note{font-size:10px;color:var(--muted);font-weight:400;}
+.ldc-body-edit{
+  margin-top:8px;padding-top:8px;border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.ldc-edit-btn{
+  background:none;border:1px solid var(--border);color:var(--muted);
+  font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;
+  cursor:pointer;font-family:inherit;
+}
+.ldc-edit-btn:active{color:var(--text);}
+.ldc-del-btn{
+  background:none;border:none;color:var(--red);
+  font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;padding:5px 0;
+}
+.ldc-del-btn:active{opacity:0.6;}
+.ledger-empty{font-size:13px;color:var(--muted);text-align:center;padding:28px 0;}
+
+/* 导出面板 */
+.ledger-history-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.ledger-export-btn{
+  background:none;border:1.5px solid var(--border);color:var(--muted);
+  font-size:11px;font-weight:700;padding:5px 12px;border-radius:9px;
+  cursor:pointer;font-family:inherit;letter-spacing:0.04em;transition:all 0.15s;
+}
+.ledger-export-btn:active{background:var(--accent);color:#1a0f00;border-color:var(--accent);}
+.ledger-export-panel{
+  display:none;background:var(--card);border-radius:13px;border:1.5px solid var(--border);
+  padding:13px 14px;margin-bottom:10px;
+}
+.ledger-export-panel.open{display:block;}
+.lep-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px;letter-spacing:0.04em;}
+.lep-select{
+  width:100%;background:var(--surface);border:1.5px solid var(--border);
+  border-radius:9px;color:var(--text);font-size:15px;font-weight:600;
+  padding:9px 12px;outline:none;font-family:inherit;margin-bottom:9px;
+  -webkit-appearance:none;appearance:none;
+}
+.lep-go-btn{
+  width:100%;border:none;border-radius:10px;padding:11px;
+  font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  background:linear-gradient(135deg,#2a5a2a,#3a7a3a);color:#c8f5a0;
+  transition:opacity 0.1s;
+}
+.lep-go-btn:active{opacity:0.78;}
+
+/* 年月分组 */
+.lh-group-year{margin-bottom:6px;}
+.lh-group-year-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;background:var(--surface);border-radius:11px;
+  border:1px solid var(--border);cursor:pointer;margin-bottom:4px;
+}
+.lh-group-year-label{font-size:13px;font-weight:800;color:var(--text);letter-spacing:-0.2px;}
+.lh-group-year-chevron{color:var(--muted);font-size:11px;transition:transform 0.2s;}
+.lh-group-year-body{display:none;padding-left:8px;}
+.lh-group-year-body.open{display:block;}
+
+.lh-group-month{margin-bottom:5px;}
+.lh-group-month-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7px 11px;background:var(--card);border-radius:10px;
+  border:1px solid var(--border);cursor:pointer;margin-bottom:3px;
+}
+.lh-group-month-label{font-size:12px;font-weight:700;color:var(--muted);}
+.lh-group-month-right{display:flex;align-items:center;gap:7px;}
+.lh-group-month-net{font-size:12px;font-weight:700;}
+.lh-group-month-chevron{color:var(--muted);font-size:10px;transition:transform 0.2s;}
+.lh-group-month-body{display:none;padding-left:8px;}
+.lh-group-month-body.open{display:block;}
+
+
+
+
 .toast{
-  position:fixed;bottom:calc(var(--tab-h)+14px);left:50%;
+  position:fixed;bottom:calc(var(--tab-h) + var(--tab-extra) + 14px);left:50%;
   transform:translateX(-50%) translateY(10px);
   background:rgba(15,17,23,0.96);color:var(--text);padding:10px 20px;
   border-radius:20px;font-size:13px;font-weight:600;
@@ -347,7 +579,7 @@ body{
 <div class="page" id="page-calc">
   <div class="calc-header">
     <div class="header-label">NENERGY · 财务工具</div>
-    <h1>🖩 计算器</h1>
+    <h1><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:8px;opacity:0.7"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="9" y2="10"/><line x1="12" y1="10" x2="13" y2="10"/><line x1="16" y1="10" x2="17" y2="10"/><line x1="8" y1="14" x2="9" y2="14"/><line x1="12" y1="14" x2="13" y2="14"/><line x1="16" y1="14" x2="17" y2="14"/><line x1="8" y1="18" x2="9" y2="18"/><line x1="12" y1="18" x2="13" y2="18"/><line x1="16" y1="18" x2="17" y2="18"/></svg>计算器</h1>
   </div>
   <div class="calc-middle">
     <div class="calc-display">
@@ -378,7 +610,8 @@ body{
     <button class="key key-num" onclick="calcNum('2')">2</button>
     <button class="key key-num" onclick="calcNum('3')">3</button>
     <button class="key key-op"  onclick="calcOp('+')">+</button>
-    <button class="key key-num key-zero" onclick="calcNum('0')">0</button>
+    <button class="key key-num" onclick="calcNum('0')">0</button>
+    <button class="key key-num" onclick="calcNum('00')" style="font-size:18px;">00</button>
     <button class="key key-num" onclick="calcNum('.')">.</button>
     <button class="key key-eq"  onclick="calcEq()">=</button>
   </div>
@@ -412,6 +645,120 @@ body{
   </div>
 </div>
 
+<!-- PAGE 4: 流水账 -->
+<div class="page" id="page-ledger">
+  <div class="page-header">
+    <div class="header-label">NENERGY · 财务工具</div>
+    <h1>📒 流水账</h1>
+  </div>
+  <div class="page-scroll">
+
+    <!-- 币种切换 -->
+    <div class="ledger-currency-tabs">
+      <button class="lct-btn active-zmw" id="lct-zmw" onclick="ledgerSetCurrency('ZMW')">🇿🇲 克瓦查 ZMW</button>
+      <button class="lct-btn" id="lct-usd" onclick="ledgerSetCurrency('USD')">🇺🇸 美元 USD</button>
+    </div>
+
+    <!-- 日期导航 -->
+    <div class="ledger-nav">
+      <button class="lnav-arrow" id="lnavPrev" onclick="ledgerNavDay(-1)">‹</button>
+      <div class="lnav-center" onclick="ledgerOpenDatePicker()">
+        <div class="lnav-date" id="lnavDateText">—<span class="lnav-today-badge" id="lnavTodayBadge">今日</span></div>
+      </div>
+      <button class="lnav-arrow" id="lnavNext" onclick="ledgerNavDay(1)" disabled>›</button>
+    </div>
+    <!-- 返回今日 -->
+    <div style="text-align:center;margin:6px 0 0;">
+      <button class="lnav-today-btn" id="lnavTodayBtn" onclick="ledgerGoToday()">↩ 返回今日</button>
+    </div>
+    <!-- 隐藏的 date input - 移出布局流 -->
+    <input type="date" id="ledgerDatePicker" onchange="ledgerPickDate(this.value)"
+      style="position:fixed;top:-200px;left:-200px;width:1px;height:1px;opacity:0;pointer-events:none;">
+
+    <!-- 结余预览 -->
+    <div class="ledger-net-card zmw" id="ledgerNetCard">
+      <div class="lnc-left">
+        <div class="lnc-label" id="ledgerNetLabel">当日结余</div>
+        <div class="lnc-formula" id="ledgerNetFormula">营业额 + 额外收入 − 支出 + 昨日结余</div>
+      </div>
+      <div class="lnc-val zmw-pos" id="ledgerNetVal">K 0</div>
+    </div>
+
+    <!-- 录入表单 -->
+    <div class="ledger-form" id="ledgerForm">
+
+      <!-- 营业额 / 收入 -->
+      <div class="ledger-form-row" id="row-income">
+        <div class="lfr-main">
+          <span class="lfr-label income" id="label-income">📈 营业额</span>
+          <span class="lfr-prefix" id="pfx-income">K</span>
+          <input class="lfr-input" id="lf-income" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview()">
+        </div>
+      </div>
+
+      <!-- 额外收入（USD 隐藏）-->
+      <div class="ledger-form-row" id="row-extra">
+        <div class="lfr-main">
+          <span class="lfr-label extra">⚡ 额外收入</span>
+          <span class="lfr-prefix" id="pfx-extra">K</span>
+          <input class="lfr-input" id="lf-extra" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview()">
+        </div>
+        <div class="lfr-note-inline">
+          <input class="lfr-note-input" id="lf-extra-note" type="text" placeholder="备注（可选）">
+        </div>
+      </div>
+
+      <!-- 收入备注（USD 专用，ZMW 隐藏）-->
+      <div class="ledger-form-row" id="row-income-note" style="display:none;">
+        <div class="lfr-note-inline" style="padding:0 10px 10px 14px;">
+          <input class="lfr-note-input" id="lf-income-note" type="text" placeholder="收入备注（可选）">
+        </div>
+      </div>
+
+      <!-- 支出 -->
+      <div class="ledger-form-row" id="row-expense">
+        <div class="lfr-main">
+          <span class="lfr-label expense">📉 支出</span>
+          <span class="lfr-prefix" id="pfx-expense">K</span>
+          <input class="lfr-input" id="lf-expense" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview()">
+        </div>
+        <div class="lfr-note-inline">
+          <input class="lfr-note-input" id="lf-expense-note" type="text" placeholder="备注（可选）">
+        </div>
+      </div>
+
+      <!-- 昨日结余（USD 隐藏）-->
+      <div class="ledger-form-row" id="row-carry">
+        <div class="lfr-main">
+          <span class="lfr-label carry">↩ 昨日结余</span>
+          <span class="lfr-prefix" id="pfx-carry">K</span>
+          <input class="lfr-input" id="lf-carry" type="number" inputmode="decimal" placeholder="自动带入" min="0" oninput="ledgerOnCarryInput()">
+        </div>
+        <div class="carry-source" id="carrySource"></div>
+      </div>
+    </div>
+
+    <button class="ledger-commit-btn zmw" id="ledgerCommitBtn" onclick="ledgerCommit()">📝 记录账目</button>
+
+    <!-- 历史 + 导出 -->
+    <div class="ledger-history">
+      <div class="ledger-history-header">
+        <div class="ledger-history-title" id="ledgerHistoryTitle">历史日报 · ZMW</div>
+        <button class="ledger-export-btn" onclick="ledgerToggleExport()">⬇ 导出</button>
+      </div>
+      <!-- 导出面板 -->
+      <div class="ledger-export-panel" id="ledgerExportPanel">
+        <div class="lep-label">选择月份导出 Excel</div>
+        <select class="lep-select" id="ledgerExportSelect">
+          <option value="">— 选择月份 —</option>
+        </select>
+        <button class="lep-go-btn" onclick="ledgerCopyToClipboard()">📋 复制数据到剪贴板</button>
+      </div>
+      <div id="ledgerEntries"></div>
+    </div>
+  </div>
+</div>
+
 <!-- TAB BAR -->
 <div class="tab-bar">
   <button class="tab-btn active" id="tab-count" onclick="goTab('count')">
@@ -432,6 +779,13 @@ body{
       <circle cx="12" cy="12" r="3"/>
       <path d="M12 4v3M12 17v3M4 12h3M17 12h3"/>
     </svg>钱仓
+  </button>
+  <button class="tab-btn" id="tab-ledger" onclick="goTab('ledger')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6h16M4 10h16M4 14h10M4 18h7"/>
+      <circle cx="19" cy="17" r="3"/>
+      <path d="M19 15v2l1 1"/>
+    </svg>流水账
   </button>
 </div>
 
@@ -459,7 +813,7 @@ body{
       </div>
     </div>
     <div class="detail-total">
-      <span class="dt-label">当前总计</span>
+      <span class="dt-label">实际总现金</span>
       <span class="dt-val" id="detailCountTotal">K 0</span>
     </div>
     <button class="modal-close" onclick="closeDetail()">关闭</button>
@@ -484,10 +838,11 @@ function showToast(msg){
 
 /* ── TABS — single clean function, no override trick ── */
 function goTab(name){
-  ['count','calc','vault'].forEach(function(t){
+  ['count','calc','vault','ledger'].forEach(function(t){
     document.getElementById('page-'+t).classList.toggle('active',t===name);
     document.getElementById('tab-'+t).classList.toggle('active',t===name);
   });
+  if(name==='ledger')ledgerInit();
 }
 
 /* ══════════════
@@ -633,6 +988,10 @@ function calcNum(ch){
     if(C.display.includes('.'))return;
     if(C.display===''||C.display==='-')C.display+='0';
     C.display+='.';
+  }else if(ch==='00'){
+    /* 00: only append if display already has non-zero content */
+    if(C.display===''||C.display==='0')return;
+    C.display+='00';
   }else{
     if(C.display==='0'||C.display==='')C.display=ch;
     else C.display+=ch;
@@ -823,7 +1182,539 @@ function attachSwipe(wrap,id){
 
 loadVault();
 
-/* ── PWA Service Worker 注册 ── */
+/* ══════════════════════════════════════
+   TAB 4 · 流水账  v2
+   - 双币种 ZMW / USD 完全分离
+   - 日期导航（左右箭头 + 日历）
+   - 修改历史日期后自动级联更新后续昨日结余
+   - 昨日结余自动带入 + 手动覆盖安全处理
+   - 额外收入/支出备注
+   - 历史倒序按日期排列
+══════════════════════════════════════ */
+var ledgerState={
+  currency:'ZMW',       /* 'ZMW' | 'USD' */
+  dateKey:'',           /* 'YYYY-M-D' */
+  carryManual:false     /* 用户是否手动改了昨日结余 */
+};
+
+/* 数据结构：分两个 key 存，互不干扰 */
+function ledgerStorageKey(cur){ return 'nenergy_ledger_v2_'+(cur||ledgerState.currency); }
+function loadLedgerAll(cur){ return lsGet(ledgerStorageKey(cur),{entries:{}}); }
+function saveLedgerAll(data,cur){ lsSet(ledgerStorageKey(cur),data); }
+
+/* ── 日期工具 ── */
+function dateToKey(d){ return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function todayKey(){ return dateToKey(new Date()); }
+function keyToDate(k){
+  var p=k.split('-').map(Number);
+  return new Date(p[0],p[1]-1,p[2]);
+}
+function keyToLabel(k){
+  var d=keyToDate(k);
+  var wd=['日','一','二','三','四','五','六'];
+  return (d.getMonth()+1)+'月'+d.getDate()+'日 (周'+wd[d.getDay()]+')';
+}
+function keyToFull(k){
+  var d=keyToDate(k);
+  return d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+}
+function keyAddDays(k,n){
+  var d=keyToDate(k);
+  d.setDate(d.getDate()+n);
+  return dateToKey(d);
+}
+function keyCompare(a,b){ return keyToDate(a)-keyToDate(b); } /* negative = a earlier */
+
+/* ── 货币显示 ── */
+function curSymbol(cur){ return cur==='USD'?'$':'K'; }
+
+/* ── 级联更新：修改某日后，重新计算所有后续日期的昨日结余 ── */
+function ledgerCascade(cur){
+  var isZMW=(cur||ledgerState.currency)==='ZMW';
+  var data=loadLedgerAll(cur);
+  var entries=data.entries||{};
+  var keys=Object.keys(entries).sort(keyCompare);
+  if(isZMW){
+    /* ZMW: 级联昨日结余 */
+    for(var i=1;i<keys.length;i++){
+      var prevNet=entries[keys[i-1]].net;
+      entries[keys[i]].carry=prevNet;
+      var e=entries[keys[i]];
+      e.net=e.income+e.extra-e.expense+e.carry;
+    }
+  }else{
+    /* USD: 无级联，每天独立 net = income - expense */
+    keys.forEach(function(k){
+      var e=entries[k];
+      e.carry=0;
+      e.net=e.income-e.expense;
+    });
+  }
+  data.entries=entries;
+  saveLedgerAll(data,cur);
+}
+
+/* ── 初始化（切 Tab 或切币种时调用）── */
+function ledgerInit(){
+  var tk=todayKey();
+  if(!ledgerState.dateKey) ledgerState.dateKey=tk;
+  ledgerState.carryManual=false;
+  ledgerRenderNav();
+  ledgerLoadDateIntoForm(ledgerState.dateKey);
+  ledgerRenderHistory();
+  ledgerUpdateCurrencyUI();
+}
+
+/* ── 币种切换 ── */
+function ledgerSetCurrency(cur){
+  ledgerState.currency=cur;
+  ledgerState.carryManual=false;
+  ledgerInit();
+}
+function ledgerUpdateCurrencyUI(){
+  var isZMW=ledgerState.currency==='ZMW';
+  document.getElementById('lct-zmw').className='lct-btn'+(isZMW?' active-zmw':'');
+  document.getElementById('lct-usd').className='lct-btn'+(!isZMW?' active-usd':'');
+  var sym=curSymbol(ledgerState.currency);
+  /* 货币前缀 */
+  ['income','extra','expense','carry'].forEach(function(f){
+    var el=document.getElementById('pfx-'+f);
+    if(el) el.textContent=sym;
+  });
+  /* ZMW：营业额+额外收入+支出+昨日结余；USD：收入+收入备注+支出+支出备注 */
+  document.getElementById('label-income').textContent=isZMW?'📈 营业额':'💵 收入';
+  document.getElementById('row-extra').style.display=isZMW?'':'none';
+  document.getElementById('row-income-note').style.display=isZMW?'none':'';
+  document.getElementById('row-carry').style.display=isZMW?'':'none';
+  /* 结余卡公式说明 */
+  document.getElementById('ledgerNetFormula').textContent=isZMW
+    ?'营业额 + 额外收入 − 支出 + 昨日结余'
+    :'收入 − 支出';
+  var nc=document.getElementById('ledgerNetCard');
+  nc.className='ledger-net-card '+(isZMW?'zmw':'usd');
+  var btn=document.getElementById('ledgerCommitBtn');
+  btn.className='ledger-commit-btn '+(isZMW?'zmw':'usd');
+  document.getElementById('ledgerHistoryTitle').textContent='历史日报 · '+ledgerState.currency;
+  ledgerPreview();
+}
+
+/* ── 日期导航 ── */
+function ledgerRenderNav(){
+  var k=ledgerState.dateKey;
+  var tk=todayKey();
+  var isToday=(k===tk);
+  document.getElementById('lnavDateText').childNodes[0].textContent=keyToLabel(k)+' ';
+  document.getElementById('lnavTodayBadge').style.display=isToday?'':'none';
+  document.getElementById('lnavTodayBtn').className='lnav-today-btn'+(isToday?'':' show');
+  /* 禁止导航到今天之后 */
+  document.getElementById('lnavNext').disabled=isToday;
+}
+function ledgerNavDay(delta){
+  var next=keyAddDays(ledgerState.dateKey,delta);
+  /* 不能跳到今天之后 */
+  if(keyCompare(next,todayKey())>0) return;
+  ledgerState.dateKey=next;
+  ledgerState.carryManual=false;
+  ledgerRenderNav();
+  ledgerLoadDateIntoForm(next);
+}
+function ledgerGoToday(){
+  ledgerState.dateKey=todayKey();
+  ledgerState.carryManual=false;
+  ledgerRenderNav();
+  ledgerLoadDateIntoForm(ledgerState.dateKey);
+}
+function ledgerOpenDatePicker(){
+  var pk=document.getElementById('ledgerDatePicker');
+  pk.max=todayKey().replace(/-(\d)(?=-|$)/g,'-0$1'); /* YYYY-MM-DD */
+  /* set current value */
+  var p=ledgerState.dateKey.split('-');
+  pk.value=p[0]+'-'+(p[1].length<2?'0':'')+p[1]+'-'+(p[2].length<2?'0':'')+p[2];
+  pk.click();
+}
+function ledgerPickDate(val){
+  if(!val) return;
+  /* val is YYYY-MM-DD, convert to our key (no leading zeros) */
+  var p=val.split('-');
+  var k=parseInt(p[0])+'-'+parseInt(p[1])+'-'+parseInt(p[2]);
+  if(keyCompare(k,todayKey())>0) return;
+  ledgerState.dateKey=k;
+  ledgerState.carryManual=false;
+  ledgerRenderNav();
+  ledgerLoadDateIntoForm(k);
+}
+
+/* ── 把某日数据填入表单 ── */
+function ledgerLoadDateIntoForm(k){
+  var data=loadLedgerAll();
+  var entries=data.entries||{};
+  var e=entries[k];
+  var isZMW=ledgerState.currency==='ZMW';
+
+  /* 清空数字字段 */
+  ['income','extra','expense'].forEach(function(f){
+    document.getElementById('lf-'+f).value=e&&e[f]?e[f]:'';
+  });
+  /* 备注字段 */
+  ['extra','expense'].forEach(function(f){
+    var noteEl=document.getElementById('lf-'+f+'-note');
+    if(noteEl) noteEl.value=e&&e[f+'Note']?e[f+'Note']:'';
+  });
+  var incNoteEl=document.getElementById('lf-income-note');
+  if(incNoteEl) incNoteEl.value=e&&e.incomeNote?e.incomeNote:'';
+
+  /* 昨日结余（仅 ZMW）*/
+  var carryInput=document.getElementById('lf-carry');
+  var carrySourceEl=document.getElementById('carrySource');
+  if(isZMW){
+    if(e){
+      carryInput.value=e.carry!==undefined?e.carry:'';
+      carrySourceEl.className='carry-source';
+      carrySourceEl.textContent='';
+    }else{
+      var prevKey=ledgerFindPrevKey(k);
+      if(prevKey&&entries[prevKey]!==undefined){
+        carryInput.value=entries[prevKey].net;
+        carrySourceEl.className='carry-source show';
+        carrySourceEl.textContent='自动带入：'+keyToLabel(prevKey)+' 结余 '+curSymbol(ledgerState.currency)+' '+fmt(entries[prevKey].net);
+      }else{
+        carryInput.value='';
+        carrySourceEl.className='carry-source';
+        carrySourceEl.textContent='';
+      }
+    }
+  }else{
+    carryInput.value='';
+    carrySourceEl.className='carry-source';
+    carrySourceEl.textContent='';
+  }
+  ledgerState.carryManual=false;
+  ledgerPreview();
+}
+
+function ledgerFindPrevKey(k){
+  /* 找比 k 早、且有记录的最近一天 */
+  var data=loadLedgerAll();
+  var entries=data.entries||{};
+  var keys=Object.keys(entries).filter(function(ek){ return keyCompare(ek,k)<0; });
+  if(!keys.length) return null;
+  keys.sort(keyCompare);
+  return keys[keys.length-1];
+}
+
+/* ── 用户手动修改昨日结余 ── */
+function ledgerOnCarryInput(){
+  ledgerState.carryManual=true;
+  document.getElementById('carrySource').className='carry-source'; /* 隐藏自动提示 */
+  ledgerPreview();
+}
+
+/* ── 实时预览 ── */
+function ledgerPreview(){
+  var isZMW=ledgerState.currency==='ZMW';
+  var income=parseFloat(document.getElementById('lf-income').value)||0;
+  var expense=parseFloat(document.getElementById('lf-expense').value)||0;
+  var net;
+  if(isZMW){
+    var extra=parseFloat(document.getElementById('lf-extra').value)||0;
+    var carry=parseFloat(document.getElementById('lf-carry').value)||0;
+    net=income+extra-expense+carry;
+  }else{
+    net=income-expense;
+  }
+  var sym=curSymbol(ledgerState.currency);
+  var valEl=document.getElementById('ledgerNetVal');
+  valEl.textContent=(net<0?'−':'')+sym+' '+fmt(Math.abs(net));
+  if(isZMW) valEl.className='lnc-val '+(net>=0?'zmw-pos':'zmw-neg');
+  else valEl.className='lnc-val '+(net>=0?'usd-pos':'usd-neg');
+}
+
+/* ── 提交 ── */
+function ledgerCommit(){
+  var k=ledgerState.dateKey;
+  var isZMW=ledgerState.currency==='ZMW';
+  var income=parseFloat(document.getElementById('lf-income').value)||0;
+  var expense=parseFloat(document.getElementById('lf-expense').value)||0;
+  var expenseNote=document.getElementById('lf-expense-note').value.trim();
+  var extra=0,carry=0,extraNote='',incomeNote='',net=0;
+  if(isZMW){
+    extra=parseFloat(document.getElementById('lf-extra').value)||0;
+    carry=parseFloat(document.getElementById('lf-carry').value)||0;
+    extraNote=document.getElementById('lf-extra-note').value.trim();
+    net=income+extra-expense+carry;
+  }else{
+    incomeNote=document.getElementById('lf-income-note').value.trim();
+    net=income-expense;
+  }
+  var data=loadLedgerAll();
+  if(!data.entries) data.entries={};
+  var existed=!!data.entries[k];
+  data.entries[k]={
+    income:income,extra:extra,expense:expense,carry:carry,net:net,
+    extraNote:extraNote,expenseNote:expenseNote,incomeNote:incomeNote,
+    ts:Date.now()
+  };
+  saveLedgerAll(data);
+  ledgerCascade(ledgerState.currency);
+  showToast(existed?'账目已更新':'账目已记录');
+  ledgerRenderHistory();
+  ledgerPreview();
+  if(k===todayKey()){
+    ['income','extra','expense'].forEach(function(f){
+      document.getElementById('lf-'+f).value='';
+    });
+    ['extra','expense'].forEach(function(f){
+      var noteEl=document.getElementById('lf-'+f+'-note');
+      if(noteEl) noteEl.value='';
+    });
+    var incNoteEl=document.getElementById('lf-income-note');
+    if(incNoteEl) incNoteEl.value='';
+    ledgerState.carryManual=false;
+    ledgerPreview();
+  }
+}
+
+/* ── 删除 ── */
+function ledgerDeleteEntry(k){
+  var data=loadLedgerAll();
+  if(data.entries) delete data.entries[k];
+  saveLedgerAll(data);
+  ledgerCascade(ledgerState.currency);
+  if(ledgerState.dateKey===k) ledgerLoadDateIntoForm(k);
+  ledgerRenderHistory();
+  showToast('已删除 '+keyToLabel(k));
+}
+
+/* ── 点击历史条目 → 跳转到该日期 ── */
+function ledgerJumpToDate(k){
+  ledgerState.dateKey=k;
+  ledgerState.carryManual=false;
+  ledgerRenderNav();
+  ledgerLoadDateIntoForm(k);
+  /* 滚动回顶部 */
+  document.querySelector('#page-ledger .page-scroll').scrollTop=0;
+}
+
+/* ── 渲染历史：年月分组 ── */
+function ledgerRenderHistory(){
+  var data=loadLedgerAll();
+  var entries=data.entries||{};
+  var keys=Object.keys(entries).sort(function(a,b){return keyCompare(b,a);});
+  var container=document.getElementById('ledgerEntries');
+  var sym=curSymbol(ledgerState.currency);
+  var cur=ledgerState.currency;
+
+  /* 更新导出下拉选项 */
+  ledgerUpdateExportSelect(entries);
+
+  if(!keys.length){container.innerHTML='<div class="ledger-empty">尚无历史账目</div>';return;}
+  container.innerHTML='';
+
+  /* 组织 year→month→[keys] */
+  var tree={};
+  keys.forEach(function(k){
+    var p=k.split('-');var y=p[0],m=p[1];
+    if(!tree[y])tree[y]={};
+    if(!tree[y][m])tree[y][m]=[];
+    tree[y][m].push(k);
+  });
+
+  var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  var thisYear=String(new Date().getFullYear());
+  var thisMonth=String(new Date().getMonth()+1);
+
+  Object.keys(tree).sort(function(a,b){return b-a;}).forEach(function(y){
+    var yDiv=document.createElement('div');
+    yDiv.className='lh-group-year';
+
+    var yHead=document.createElement('div');
+    yHead.className='lh-group-year-head';
+    yHead.innerHTML='<span class="lh-group-year-label">'+y+'年</span><span class="lh-group-year-chevron">▾</span>';
+
+    var yBody=document.createElement('div');
+    yBody.className='lh-group-year-body'+(y===thisYear?' open':'');
+    yHead.onclick=function(){
+      var open=yBody.classList.toggle('open');
+      yHead.querySelector('.lh-group-year-chevron').style.transform=open?'rotate(180deg)':'';
+    };
+    if(y!==thisYear) yHead.querySelector('.lh-group-year-chevron').style.transform='rotate(-90deg)';
+
+    Object.keys(tree[y]).sort(function(a,b){return b-a;}).forEach(function(m){
+      var mKeys=tree[y][m];
+      var mNet=mKeys.reduce(function(s,k){return s+(entries[k].net||0);},0);
+      var mNetSign=mNet>=0?'+':'−';
+      var mNetCls=cur==='ZMW'?(mNet>=0?'pos':'neg'):(mNet>=0?'pos-usd':'neg');
+
+      var mDiv=document.createElement('div');
+      mDiv.className='lh-group-month';
+
+      var mHead=document.createElement('div');
+      mHead.className='lh-group-month-head';
+      mHead.innerHTML=
+        '<span class="lh-group-month-label">'+monthNames[parseInt(m)]+'</span>'+
+        '<div class="lh-group-month-right">'+
+          '<span class="lh-group-month-net ldc-head-net '+mNetCls+'">'+mNetSign+sym+' '+fmt(Math.abs(mNet))+'</span>'+
+          '<span class="lh-group-month-chevron">▾</span>'+
+        '</div>';
+
+      var mBody=document.createElement('div');
+      var isCurrentMonth=(y===thisYear&&m===thisMonth);
+      mBody.className='lh-group-month-body'+(isCurrentMonth?' open':'');
+      if(!isCurrentMonth) mHead.querySelector('.lh-group-month-chevron').style.transform='rotate(-90deg)';
+
+      mHead.onclick=function(){
+        var open=mBody.classList.toggle('open');
+        mHead.querySelector('.lh-group-month-chevron').style.transform=open?'rotate(180deg)':'rotate(-90deg)';
+      };
+
+      mKeys.forEach(function(k){
+        var e=entries[k];
+        var net=e.net;
+        var netSign=net>=0?'+':'−';
+        var netCls=cur==='ZMW'?(net>=0?'pos':'neg'):(net>=0?'pos-usd':'neg');
+        var isActive=(k===ledgerState.dateKey);
+        var card=document.createElement('div');
+        card.className='ledger-day-card';
+        if(isActive) card.style.border='1.5px solid '+(cur==='ZMW'?'#3a7a3a':'#2e3e7a');
+        card.innerHTML=
+          '<div class="ldc-head" onclick="toggleLedgerCard(this)">'+
+            '<span class="ldc-head-date">'+keyToLabel(k)+(isActive?'  <span style="font-size:9px;color:var(--accent);">✏</span>':'')+'</span>'+
+            '<div class="ldc-head-right">'+
+              '<span class="ldc-head-net '+netCls+'">'+netSign+sym+' '+fmt(Math.abs(net))+'</span>'+
+              '<span class="ldc-chevron">▾</span>'+
+            '</div>'+
+          '</div>'+
+          '<div class="ldc-body">'+
+            '<div class="ldc-divider"></div>'+
+            (cur==='ZMW'?
+              '<div class="ldc-body-row"><span class="ldb-label">📈 营业额</span><div class="ldb-right"><span class="ldb-val inc">'+sym+' '+fmt(e.income)+'</span></div></div>'+
+              '<div class="ldc-body-row"><span class="ldb-label">⚡ 额外收入</span><div class="ldb-right"><span class="ldb-val ext">'+sym+' '+fmt(e.extra)+'</span>'+(e.extraNote?'<span class="ldb-note">'+escHtml(e.extraNote)+'</span>':'')+'</div></div>'+
+              '<div class="ldc-body-row"><span class="ldb-label">📉 支出</span><div class="ldb-right"><span class="ldb-val exp">−'+sym+' '+fmt(e.expense)+'</span>'+(e.expenseNote?'<span class="ldb-note">'+escHtml(e.expenseNote)+'</span>':'')+'</div></div>'+
+              '<div class="ldc-body-row"><span class="ldb-label">↩ 昨日结余</span><div class="ldb-right"><span class="ldb-val carry">'+sym+' '+fmt(e.carry)+'</span></div></div>'
+            :
+              '<div class="ldc-body-row"><span class="ldb-label">💵 收入</span><div class="ldb-right"><span class="ldb-val inc">'+sym+' '+fmt(e.income)+'</span>'+(e.incomeNote?'<span class="ldb-note">'+escHtml(e.incomeNote)+'</span>':'')+'</div></div>'+
+              '<div class="ldc-body-row"><span class="ldb-label">📉 支出</span><div class="ldb-right"><span class="ldb-val exp">−'+sym+' '+fmt(e.expense)+'</span>'+(e.expenseNote?'<span class="ldb-note">'+escHtml(e.expenseNote)+'</span>':'')+'</div></div>'
+            )+
+            '<div class="ldc-body-edit">'+
+              '<button class="ldc-del-btn" onclick="ledgerDeleteEntry(\''+k+'\')">删除</button>'+
+              '<button class="ldc-edit-btn" onclick="ledgerJumpToDate(\''+k+'\')">✏ 编辑</button>'+
+            '</div>'+
+          '</div>';
+        mBody.appendChild(card);
+      });
+
+      mDiv.appendChild(mHead);
+      mDiv.appendChild(mBody);
+      yBody.appendChild(mDiv);
+    });
+
+    yDiv.appendChild(yHead);
+    yDiv.appendChild(yBody);
+    container.appendChild(yDiv);
+  });
+}
+
+function toggleLedgerCard(headEl){
+  var body=headEl.nextElementSibling;
+  var open=body.classList.toggle('open');
+  headEl.querySelector('.ldc-chevron').style.transform=open?'rotate(180deg)':'';
+}
+
+/* ── 导出面板 ── */
+function ledgerToggleExport(){
+  document.getElementById('ledgerExportPanel').classList.toggle('open');
+}
+
+function ledgerUpdateExportSelect(entries){
+  var sel=document.getElementById('ledgerExportSelect');
+  var cur=ledgerState.currency;
+  var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  /* collect unique year-month combos */
+  var seen={};
+  Object.keys(entries||{}).sort(keyCompare).reverse().forEach(function(k){
+    var p=k.split('-');var ym=p[0]+'_'+p[1];
+    if(!seen[ym]){seen[ym]={y:p[0],m:p[1]};}
+  });
+  sel.innerHTML='<option value="">— 选择月份 —</option>';
+  Object.keys(seen).sort(function(a,b){return b.localeCompare(a);}).forEach(function(ym){
+    var s=seen[ym];
+    var opt=document.createElement('option');
+    opt.value=ym;
+    opt.textContent=s.y+'年 '+monthNames[parseInt(s.m)]+' ('+cur+')';
+    sel.appendChild(opt);
+  });
+}
+
+function ledgerExportSelected(){
+  ledgerCopyToClipboard();
+}
+
+function ledgerCopyToClipboard(){
+  var sel=document.getElementById('ledgerExportSelect');
+  if(!sel.value){showToast('请先选择月份');return;}
+  var parts=sel.value.split('_');
+  var year=parts[0],month=parts[1];
+  var cur=ledgerState.currency;
+  var isZMW=cur==='ZMW';
+  var data=loadLedgerAll();
+  var entries=data.entries||{};
+  var keys=Object.keys(entries).filter(function(k){
+    var p=k.split('-');return p[0]===year&&p[1]===month;
+  }).sort(keyCompare);
+  if(!keys.length){showToast('该月无数据');return;}
+  var lines=[];
+  keys.forEach(function(k){
+    var e=entries[k];var p=k.split('-');
+    if(isZMW){
+      lines.push([p[0]+'-'+p[1]+'-'+p[2],
+        e.income||0,e.extra||0,e.expense||0,e.carry||0,e.net||0,
+        csvQ(e.extraNote||''),csvQ(e.expenseNote||'')].join(','));
+    }else{
+      lines.push([p[0]+'-'+p[1]+'-'+p[2],
+        e.income||0,e.expense||0,e.net||0,
+        csvQ(e.incomeNote||''),csvQ(e.expenseNote||'')].join(','));
+    }
+  });
+  var csv=lines.join('\n');
+  var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  var label=year+'年'+monthNames[parseInt(month)]+' · '+keys.length+'条';
+  navigator.clipboard.writeText(csv).then(function(){
+    showToast('✓ '+label+' 已复制，粘贴到 Excel 模板即可');
+  }).catch(function(){
+    var ta=document.createElement('textarea');
+    ta.value=csv;
+    ta.style.cssText='position:fixed;top:15%;left:4%;width:92%;height:45%;z-index:9999;font-size:11px;padding:10px;background:#1a1d27;color:#f0f2ff;border:2px solid #f5a623;border-radius:12px;';
+    document.body.appendChild(ta);ta.focus();ta.select();
+    showToast('请全选复制上方文本，8秒后关闭');
+    setTimeout(function(){if(ta.parentNode)ta.parentNode.removeChild(ta);},8000);
+  });
+}
+
+function ledgerFallbackDownload(blob,fileName){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download=fileName;
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+}
+
+function csvQ(s){
+  s=String(s||'');
+  if(s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0){
+    return '"'+s.replace(/"/g,'""')+'"';
+  }
+  return s;
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadLedger();
+function loadLedger(){ /* data loaded on demand via loadLedgerAll() */ }
+
+
+
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
     navigator.serviceWorker.register('sw.js').catch(function(){});

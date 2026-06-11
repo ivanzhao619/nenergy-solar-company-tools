@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NENERGY 盘账</title>
+<!-- PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NENERGY">
+<meta name="theme-color" content="#0f1117">
+<link rel="manifest" href="manifest.json">
+<!-- iOS 主屏幕图标（SVG inline fallback，真实图标在 manifest） -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--card:#22263a;
+  --accent:#f5a623;--accent2:#e8870a;
+  --text:#f0f2ff;--muted:#6b7099;
+  --green:#2ecc71;--red:#e74c3c;--border:#2e3250;
+  --tab-h:68px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{
+  color:var(--text);
+  font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  display:flex;flex-direction:column;
+  -webkit-tap-highlight-color:transparent;user-select:none;
+}
+
+/* ── TAB BAR ── */
+.tab-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  height:var(--tab-h);background:rgba(15,17,23,0.97);
+  backdrop-filter:blur(20px);border-top:1px solid var(--border);
+  display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);
+}
+.tab-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;background:none;border:none;
+  color:var(--muted);font-size:10px;font-weight:600;letter-spacing:0.04em;
+  cursor:pointer;transition:color 0.15s;padding-top:6px;font-family:inherit;
+}
+.tab-btn svg{width:22px;height:22px;transition:transform 0.15s;}
+.tab-btn.active{color:var(--accent);}
+.tab-btn.active svg{transform:scale(1.12);}
+
+/* ── PAGES ── */
+.page{
+  display:none;flex-direction:column;
+  height:calc(100dvh - var(--tab-h));
+  overflow:hidden;background:var(--bg);
+}
+.page.active{display:flex;}
+.page-scroll{
+  flex:1;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  background:var(--bg);
+}
+
+/* ── HEADER ── */
+.page-header{
+  background:linear-gradient(135deg,#1a1d27 0%,#22263a 100%);
+  padding:52px 22px 16px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.header-label{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:3px;}
+.page-header h1{font-size:21px;font-weight:700;letter-spacing:-0.3px;}
+
+/* ══ TAB 1 · 点钞 ══ */
+.total-bar{
+  background:linear-gradient(135deg,var(--accent2) 0%,var(--accent) 100%);
+  margin:12px 13px 0;border-radius:18px;padding:14px 18px;
+  box-shadow:0 8px 32px rgba(245,166,35,0.28);flex-shrink:0;
+}
+.tb-label{font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(0,0,0,0.5);margin-bottom:2px;}
+.tb-amount{font-size:38px;font-weight:800;color:#1a0f00;letter-spacing:-1px;line-height:1;}
+.tb-currency{font-size:15px;font-weight:700;color:rgba(0,0,0,0.45);margin-right:2px;}
+.tb-breakdown{margin-top:5px;font-size:11px;color:rgba(0,0,0,0.4);font-weight:500;}
+.tb-actions{display:flex;gap:7px;margin-top:10px;}
+.tb-btn{flex:1;border:none;border-radius:10px;padding:8px 4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity 0.1s;}
+.tb-btn:active{opacity:0.72;}
+.tb-btn-send{background:rgba(0,0,0,0.2);color:#1a0f00;}
+.tb-btn-detail{background:rgba(0,0,0,0.12);color:#1a0f00;}
+.tb-btn-reset{background:rgba(0,0,0,0.1);color:rgba(0,0,0,0.45);}
+
+/* 面值列表紧凑：小section-label + 小gap + 小内边距 */
+.section-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:10px 18px 6px;}
+.denom-list{display:flex;flex-direction:column;gap:7px;padding:0 13px 12px;}
+.denom-card{
+  background:var(--card);border-radius:14px;border:1.5px solid var(--border);
+  padding:11px 14px;display:flex;align-items:center;gap:11px;
+  transition:border-color 0.15s,box-shadow 0.15s;
+}
+.denom-card.active{border-color:var(--denom-color,var(--accent));box-shadow:0 0 0 3px var(--denom-glow,rgba(245,166,35,0.12));}
+.denom-card[data-d="50"].active{--denom-color:#3a8aca;--denom-glow:rgba(58,138,202,0.2);}
+.denom-card[data-d="100"].active{--denom-color:#c8ab60;--denom-glow:rgba(200,171,96,0.2);}
+.denom-card[data-d="200"].active{--denom-color:#9a70cc;--denom-glow:rgba(154,112,204,0.2);}
+.denom-card[data-d="500"].active{--denom-color:#5a9a50;--denom-glow:rgba(90,154,80,0.2);}
+.denom-badge{width:48px;height:48px;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;line-height:1;overflow:hidden;}
+.denom-badge.d50{background:linear-gradient(135deg,#1c2e42,#2a4060);color:#9dd4f5;border:1.5px solid #3a7aaa;}
+.denom-badge.d100{background:linear-gradient(135deg,#0e1520,#1a2535);color:#c8ab60;border:1.5px solid #2a3a55;}
+.denom-badge.d200{background:linear-gradient(135deg,#2e2040,#3a2e10);color:#e8c87a;border:1.5px solid #e8c87a;}
+.denom-badge.d500{background:linear-gradient(135deg,#1a2e1a,#2a3822);color:#a8d890;border:1.5px solid #a8d890;}
+.denom-badge .val{font-size:15px;font-weight:900;}
+.denom-badge .unit{font-size:7px;font-weight:600;opacity:0.6;letter-spacing:0.05em;margin-top:1px;}
+.denom-info{flex:1;min-width:0;}
+.denom-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:1px;}
+.denom-subtotal{font-size:11px;color:var(--muted);font-weight:500;}
+.denom-subtotal.nonzero{color:var(--green);font-weight:600;}
+.qty-control{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.qty-btn{width:32px;height:32px;border-radius:8px;border:none;font-size:19px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.07s;font-family:inherit;}
+.qty-btn.minus{background:var(--border);color:var(--muted);}
+.qty-btn.plus{background:var(--accent);color:#1a0f00;}
+.qty-btn:active{transform:scale(0.86);}
+.qty-input{
+  width:44px;text-align:center;background:var(--surface);
+  border:1.5px solid var(--border);border-radius:8px;color:var(--text);
+  font-size:16px;font-weight:700;padding:4px 2px;
+  -webkit-appearance:none;appearance:none;outline:none;font-family:inherit;
+}
+.qty-input:focus{border-color:var(--accent);}
+.qty-input::-webkit-outer-spin-button,.qty-input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.qty-input[type=number]{-moz-appearance:textfield;}
+
+/* ══ DETAIL MODAL ══ */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.72);
+  backdrop-filter:blur(8px);z-index:200;
+  display:flex;align-items:flex-end;
+  opacity:0;pointer-events:none;transition:opacity 0.22s;
+}
+.modal-overlay.show{opacity:1;pointer-events:all;}
+.modal-sheet{
+  background:var(--surface);border-radius:26px 26px 0 0;
+  padding:22px 20px 38px;width:100%;
+  border-top:1px solid var(--border);
+  transform:translateY(40px);transition:transform 0.28s cubic-bezier(0.34,1.36,0.64,1);
+}
+.modal-overlay.show .modal-sheet{transform:translateY(0);}
+.modal-handle{width:38px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px;}
+.modal-title{font-size:17px;font-weight:800;color:var(--text);margin-bottom:16px;letter-spacing:-0.3px;}
+.detail-section{margin-bottom:12px;}
+.detail-section-title{font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:7px;}
+.detail-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 12px;background:var(--card);border-radius:10px;
+  margin-bottom:4px;border:1px solid var(--border);
+}
+.detail-row:last-child{margin-bottom:0;}
+.dr-label{font-size:13px;color:var(--muted);}
+.dr-val{font-size:14px;font-weight:700;color:var(--text);}
+.detail-total{
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  border-radius:13px;padding:13px 16px;
+  display:flex;justify-content:space-between;align-items:center;margin-top:6px;
+}
+.detail-total .dt-label{font-size:12px;font-weight:700;color:rgba(0,0,0,0.5);}
+.detail-total .dt-val{font-size:22px;font-weight:900;color:#1a0f00;letter-spacing:-0.5px;}
+.modal-close{
+  width:100%;margin-top:13px;background:var(--card);
+  border:1.5px solid var(--border);color:var(--text);
+  border-radius:12px;padding:12px;font-size:15px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:background 0.1s;
+}
+.modal-close:active{background:var(--border);}
+
+/* ══ TAB 2 · 计算器 ══
+   Grid 3行: header(auto) | middle(1fr) | keys(auto)
+   middle 内部 flex 竖排: display(fixed) + log(flex:1)
+   键盘固定高度，不依赖 JS
+══ */
+#page-calc{
+  display:none;
+  grid-template-rows:auto 1fr auto;
+  overflow:hidden;
+  background:var(--surface);
+}
+#page-calc.active{display:grid;}
+
+/* Header — 与点钞/钱仓完全一致 */
+.calc-header{
+  background:linear-gradient(135deg,#1a1d27 0%,#22263a 100%);
+  padding:52px 22px 14px;border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.calc-header .header-label{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:3px;}
+.calc-header h1{font-size:21px;font-weight:700;letter-spacing:-0.3px;}
+
+/* Middle wrapper: 占满 grid row 1fr，内部竖向 flex */
+.calc-middle{
+  display:flex;flex-direction:column;
+  overflow:hidden;min-height:0;
+}
+
+/* 显示区：固定高度，不随内容撑大 */
+.calc-display{
+  flex-shrink:0;
+  padding:12px 20px 10px;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  background:var(--surface);border-bottom:1px solid var(--border);
+}
+.calc-expr{font-size:16px;font-weight:500;color:var(--muted);text-align:right;word-break:break-all;line-height:1.3;min-height:20px;}
+.calc-result{font-size:48px;font-weight:800;color:var(--accent);text-align:right;letter-spacing:-2px;line-height:1;min-height:54px;margin-top:2px;}
+
+/* 计算过程：flex:1 占剩余空间，可滚动 */
+.calc-log{
+  flex:1;min-height:0;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:var(--bg);border-bottom:1px solid var(--border);
+}
+.calc-log-inner{padding:7px 14px;}
+.calc-log-title{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:4px;}
+.calc-log-empty{font-size:12px;color:var(--muted);text-align:center;padding:8px 0;}
+.log-entry{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(46,50,80,0.5);font-size:12px;}
+.log-entry:last-child{border-bottom:none;}
+.log-step{color:var(--muted);flex:1;}
+.log-running{color:var(--text);font-weight:700;margin-left:8px;flex-shrink:0;}
+
+/* 键盘：固定高度，5行×56px + gaps + padding，不依赖 JS */
+.calc-keys{
+  flex-shrink:0;
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:6px;padding:6px 9px 8px;
+  background:var(--surface);
+}
+.key{
+  border-radius:12px;border:none;height:56px;
+  font-size:22px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform 0.07s,opacity 0.07s;font-family:inherit;
+}
+.key:active{transform:scale(0.91);opacity:0.75;}
+.key-num{background:var(--card);color:var(--text);}
+.key-op{background:#252038;color:#c0a0ff;}
+.key-fn{background:#20222e;color:var(--muted);font-size:14px;}
+.key-eq{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#1a0f00;}
+.key-zero{grid-column:span 2;justify-content:flex-start;padding-left:20px;}
+.key-del{font-size:17px;}
+
+/* ══ TAB 3 · 钱仓 ══ */
+#page-vault{background:var(--bg);}
+.vault-balance-card{
+  margin:14px 13px 0;
+  background:linear-gradient(135deg,#1a2e1a 0%,#2a3822 100%);
+  border-radius:20px;padding:18px 20px;
+  border:1.5px solid #a8d890;box-shadow:0 8px 28px rgba(90,154,80,0.2);
+}
+.vb-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(168,216,144,0.6);font-weight:600;margin-bottom:3px;}
+.vb-amount{font-size:40px;font-weight:800;color:#a8d890;letter-spacing:-1px;line-height:1;}
+.vb-currency{font-size:17px;font-weight:700;opacity:0.6;margin-right:2px;}
+.vb-updated{margin-top:5px;font-size:11px;color:rgba(168,216,144,0.45);}
+.vault-input-area{margin:12px 13px 0;background:var(--card);border-radius:16px;border:1.5px solid var(--border);padding:14px;}
+.vault-input-row{display:flex;gap:8px;align-items:center;margin-bottom:9px;}
+.vault-sign-btn{
+  width:42px;height:42px;border-radius:10px;border:none;
+  font-size:22px;font-weight:700;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:inherit;transition:opacity 0.1s;
+}
+.vault-sign-btn:active{opacity:0.7;}
+.vs-plus{background:rgba(46,204,113,0.15);color:var(--green);border:1.5px solid rgba(46,204,113,0.25);}
+.vs-minus{background:rgba(231,76,60,0.15);color:var(--red);border:1.5px solid rgba(231,76,60,0.25);}
+.vs-plus.sel{background:var(--green);color:#fff;border-color:var(--green);}
+.vs-minus.sel{background:var(--red);color:#fff;border-color:var(--red);}
+.vault-amount-input{
+  flex:1;background:var(--surface);border:1.5px solid var(--border);
+  border-radius:10px;color:var(--text);font-size:16px;font-weight:700;
+  padding:9px 12px;outline:none;font-family:inherit;
+  -webkit-appearance:none;appearance:none;
+}
+.vault-amount-input:focus{border-color:var(--green);}
+.vault-amount-input::-webkit-outer-spin-button,.vault-amount-input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.vault-amount-input[type=number]{-moz-appearance:textfield;}
+.vault-note-input{
+  width:100%;background:var(--surface);border:1.5px solid var(--border);
+  border-radius:10px;color:var(--text);font-size:16px;font-weight:400;
+  padding:9px 12px;outline:none;font-family:inherit;margin-bottom:9px;
+}
+.vault-note-input:focus{border-color:var(--border);}
+.vault-note-input::placeholder{color:var(--muted);}
+.vault-confirm-btn{
+  width:100%;border:none;border-radius:11px;padding:12px;
+  font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  background:linear-gradient(135deg,#2a6a2a,#3a8a3a);color:#c8f5a0;transition:opacity 0.1s;
+}
+.vault-confirm-btn:active{opacity:0.78;}
+.vault-log{flex:1;overflow-y:auto;padding:12px 13px 10px;-webkit-overflow-scrolling:touch;}
+.vault-log-title{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:9px;}
+.vault-log-empty{font-size:13px;color:var(--muted);text-align:center;padding:20px 0;}
+.vault-entry-wrap{position:relative;border-radius:12px;margin-bottom:7px;overflow:hidden;touch-action:pan-y;}
+.vault-entry-delete{
+  position:absolute;right:0;top:0;bottom:0;width:80px;background:var(--red);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:#fff;border-radius:0 12px 12px 0;
+}
+.vault-entry{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 13px;background:var(--card);
+  border-radius:12px;border:1px solid var(--border);
+  position:relative;transition:transform 0.25s ease;will-change:transform;
+}
+.ve-left{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
+.ve-date{font-size:11px;color:var(--muted);font-weight:500;}
+.ve-note{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+.ve-amount{font-size:18px;font-weight:800;flex-shrink:0;margin-left:10px;}
+.ve-plus{color:var(--green);}
+.ve-minus{color:var(--red);}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:calc(var(--tab-h)+14px);left:50%;
+  transform:translateX(-50%) translateY(10px);
+  background:rgba(15,17,23,0.96);color:var(--text);padding:10px 20px;
+  border-radius:20px;font-size:13px;font-weight:600;
+  opacity:0;transition:opacity 0.2s,transform 0.2s;z-index:300;
+  white-space:nowrap;border:1px solid var(--border);backdrop-filter:blur(10px);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: 点钞 -->
+<div class="page active" id="page-count">
+  <div class="page-header">
+    <div class="header-label">NENERGY · 财务工具</div>
+    <h1>💴 点钞</h1>
+  </div>
+  <div class="page-scroll">
+    <div class="total-bar">
+      <div class="tb-label">本次合计</div>
+      <div class="tb-amount"><span class="tb-currency">K</span><span id="totalAmt">0</span></div>
+      <div class="tb-breakdown" id="breakdown">尚未录入数量</div>
+      <div class="tb-actions">
+        <button class="tb-btn tb-btn-detail" onclick="showDetail()">☰ 查看明细</button>
+        <button class="tb-btn tb-btn-send" onclick="sendToCalc()">→ 发送计算器</button>
+        <button class="tb-btn tb-btn-reset" onclick="resetAll()">清零</button>
+      </div>
+    </div>
+    <div class="section-label">面值 · 输入张数</div>
+    <div class="denom-list" id="denomList"></div>
+  </div>
+</div>
+
+<!-- PAGE 2: 计算器 -->
+<div class="page" id="page-calc">
+  <div class="calc-header">
+    <div class="header-label">NENERGY · 财务工具</div>
+    <h1>🖩 计算器</h1>
+  </div>
+  <div class="calc-middle">
+    <div class="calc-display">
+      <div class="calc-expr" id="calcExpr"></div>
+      <div class="calc-result" id="calcResult">0</div>
+    </div>
+    <div class="calc-log" id="calcLog">
+      <div class="calc-log-inner">
+        <div class="calc-log-title">计算过程</div>
+        <div class="calc-log-empty" id="calcLogEmpty">开始计算后显示每步记录</div>
+      </div>
+    </div>
+  </div>
+  <div class="calc-keys" id="calcKeys">
+    <button class="key key-fn"  onclick="calcFn('AC')">AC</button>
+    <button class="key key-fn key-del" onclick="calcFn('DEL')">⌫</button>
+    <button class="key key-fn"  onclick="calcFn('%')">%</button>
+    <button class="key key-op"  onclick="calcOp('÷')">÷</button>
+    <button class="key key-num" onclick="calcNum('7')">7</button>
+    <button class="key key-num" onclick="calcNum('8')">8</button>
+    <button class="key key-num" onclick="calcNum('9')">9</button>
+    <button class="key key-op"  onclick="calcOp('×')">×</button>
+    <button class="key key-num" onclick="calcNum('4')">4</button>
+    <button class="key key-num" onclick="calcNum('5')">5</button>
+    <button class="key key-num" onclick="calcNum('6')">6</button>
+    <button class="key key-op"  onclick="calcOp('−')">−</button>
+    <button class="key key-num" onclick="calcNum('1')">1</button>
+    <button class="key key-num" onclick="calcNum('2')">2</button>
+    <button class="key key-num" onclick="calcNum('3')">3</button>
+    <button class="key key-op"  onclick="calcOp('+')">+</button>
+    <button class="key key-num key-zero" onclick="calcNum('0')">0</button>
+    <button class="key key-num" onclick="calcNum('.')">.</button>
+    <button class="key key-eq"  onclick="calcEq()">=</button>
+  </div>
+</div>
+
+<!-- PAGE 3: 钱仓 -->
+<div class="page" id="page-vault">
+  <div class="page-header">
+    <div class="header-label">NENERGY · 财务工具</div>
+    <h1>🏦 钱仓</h1>
+  </div>
+  <div class="page-scroll">
+    <div class="vault-balance-card">
+      <div class="vb-label">当前库存</div>
+      <div class="vb-amount"><span class="vb-currency">K</span><span id="vaultBalance">0</span></div>
+      <div class="vb-updated" id="vaultUpdated">尚无记录</div>
+    </div>
+    <div class="vault-input-area">
+      <div class="vault-input-row">
+        <button class="vault-sign-btn vs-plus sel" id="signPlus" onclick="selectSign('+')">+</button>
+        <button class="vault-sign-btn vs-minus" id="signMinus" onclick="selectSign('-')">−</button>
+        <input class="vault-amount-input" id="vaultAmtInput" type="number" inputmode="decimal" placeholder="输入金额" min="0">
+      </div>
+      <input class="vault-note-input" id="vaultNoteInput" type="text" placeholder="备注（可选）">
+      <button class="vault-confirm-btn" onclick="vaultCommit()">确认记录</button>
+    </div>
+    <div class="vault-log">
+      <div class="vault-log-title">近期流水（30天）· 左滑删除</div>
+      <div id="vaultEntries"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-count" onclick="goTab('count')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="7" width="20" height="11" rx="2.5"/>
+      <path d="M16 3H8M6 11h.01M10 11h.01M14 11h.01M6 15h.01M10 15h.01"/>
+    </svg>点钞
+  </button>
+  <button class="tab-btn" id="tab-calc" onclick="goTab('calc')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2"/>
+      <path d="M8 6h8M8 10h1M12 10h1M16 10h1M8 14h1M12 14h1M16 14h1M8 18h1M12 18h1M16 18h1"/>
+    </svg>计算器
+  </button>
+  <button class="tab-btn" id="tab-vault" onclick="goTab('vault')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2"/>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 4v3M12 17v3M4 12h3M17 12h3"/>
+    </svg>钱仓
+  </button>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detailOverlay" onclick="closeDetailOutside(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📋 盘账明细</div>
+    <div class="detail-section">
+      <div class="detail-section-title">点钞明细</div>
+      <div id="detailDenoms"></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">计算器当前结果</div>
+      <div class="detail-row">
+        <span class="dr-label">计算器</span>
+        <span class="dr-val" id="detailCalc">K 0</span>
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">钱仓库存</div>
+      <div class="detail-row">
+        <span class="dr-label">钱仓余额</span>
+        <span class="dr-val" id="detailVault">K 0</span>
+      </div>
+    </div>
+    <div class="detail-total">
+      <span class="dt-label">当前总计</span>
+      <span class="dt-val" id="detailCountTotal">K 0</span>
+    </div>
+    <button class="modal-close" onclick="closeDetail()">关闭</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── STORAGE ── */
+function lsGet(k,def){try{var v=localStorage.getItem(k);return v!==null?JSON.parse(v):def;}catch(e){return def;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+/* ── TOAST ── */
+var toastTmr;
+function showToast(msg){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastTmr);
+  toastTmr=setTimeout(function(){el.classList.remove('show');},2200);
+}
+
+/* ── TABS — single clean function, no override trick ── */
+function goTab(name){
+  ['count','calc','vault'].forEach(function(t){
+    document.getElementById('page-'+t).classList.toggle('active',t===name);
+    document.getElementById('tab-'+t).classList.toggle('active',t===name);
+  });
+}
+
+/* ══════════════
+   TAB 1 · 点钞
+══════════════ */
+var DENOMS=[
+  {value:50, cls:'d50', name:'五十克瓦查', unit:'ZMW'},
+  {value:100,cls:'d100',name:'一百克瓦查', unit:'ZMW'},
+  {value:200,cls:'d200',name:'两百克瓦查', unit:'ZMW'},
+  {value:500,cls:'d500',name:'五百克瓦查', unit:'ZMW'},
+];
+var counts={50:0,100:0,200:0,500:0};
+
+function fmt(n){return Number(n).toLocaleString('en-US');}
+
+function recalc(){
+  var total=0;var parts=[];
+  DENOMS.forEach(function(d){
+    var q=counts[d.value],sub=q*d.value;total+=sub;
+    if(q>0)parts.push('K'+d.value+'×'+q);
+    var subEl=document.getElementById('sub-'+d.value);
+    if(subEl){subEl.textContent=q>0?'K '+fmt(sub):'— 张';subEl.className='denom-subtotal'+(q>0?' nonzero':'');}
+    var card=document.getElementById('card-'+d.value);
+    if(card)card.classList.toggle('active',q>0);
+  });
+  document.getElementById('totalAmt').textContent=fmt(total);
+  document.getElementById('breakdown').textContent=parts.length?parts.join('  +  '):'尚未录入数量';
+}
+
+function setCount(val,n){
+  counts[val]=Math.max(0,n);
+  var inp=document.getElementById('inp-'+val);
+  if(inp)inp.value=counts[val];
+  recalc();
+}
+function adjustCount(val,delta){setCount(val,counts[val]+delta);}
+function resetAll(){
+  DENOMS.forEach(function(d){
+    counts[d.value]=0;
+    var inp=document.getElementById('inp-'+d.value);
+    if(inp)inp.value=0;
+  });
+  recalc();
+}
+function getCountTotal(){
+  return DENOMS.reduce(function(s,d){return s+counts[d.value]*d.value;},0);
+}
+function sendToCalc(){
+  var t=getCountTotal();
+  if(t===0){showToast('金额为 0，请先录入张数');return;}
+  calcInjectValue(t);
+  goTab('calc');
+  showToast('K '+fmt(t)+' 已发送到计算器');
+}
+
+/* Detail modal */
+function showDetail(){
+  var countTotal=getCountTotal();
+  var denomHtml='';
+  DENOMS.forEach(function(d){
+    var q=counts[d.value],sub=q*d.value;
+    denomHtml+='<div class="detail-row"><span class="dr-label">K'+d.value+' × '+q+' 张</span><span class="dr-val">K '+fmt(sub)+'</span></div>';
+  });
+  document.getElementById('detailDenoms').innerHTML=denomHtml;
+  var calcVal=parseFloat(C.display)||0;
+  var vaultVal=Math.max(0,vaultData.balance||0);
+  document.getElementById('detailCalc').textContent='K '+fmt(calcVal);
+  document.getElementById('detailVault').textContent='K '+fmt(vaultVal);
+  document.getElementById('detailCountTotal').textContent='K '+fmt(calcVal+vaultVal);
+  document.getElementById('detailOverlay').classList.add('show');
+}
+function closeDetail(){document.getElementById('detailOverlay').classList.remove('show');}
+function closeDetailOutside(e){if(e.target===document.getElementById('detailOverlay'))closeDetail();}
+
+/* Build 点钞 UI */
+(function(){
+  var list=document.getElementById('denomList');
+  DENOMS.forEach(function(d){
+    var card=document.createElement('div');
+    card.className='denom-card';card.id='card-'+d.value;card.dataset.d=d.value;
+    card.innerHTML=
+      '<div class="denom-badge '+d.cls+'"><div class="val">'+d.value+'</div><div class="unit">'+d.unit+'</div></div>'+
+      '<div class="denom-info">'+
+        '<div class="denom-name">'+d.name+'</div>'+
+        '<div class="denom-subtotal" id="sub-'+d.value+'">— 张</div>'+
+      '</div>'+
+      '<div class="qty-control">'+
+        '<button class="qty-btn minus" ontouchstart="" onclick="adjustCount('+d.value+',-1)">−</button>'+
+        '<input class="qty-input" id="inp-'+d.value+'" type="number" min="0" value="0"'+
+        ' inputmode="numeric" pattern="[0-9]*"'+
+        ' onchange="setCount('+d.value+',parseInt(this.value)||0)" onfocus="this.select()"/>'+
+        '<button class="qty-btn plus" ontouchstart="" onclick="adjustCount('+d.value+',1)">+</button>'+
+      '</div>';
+    list.appendChild(card);
+  });
+  recalc();
+})();
+
+/* ══════════════════
+   TAB 2 · 计算器
+══════════════════ */
+var C={
+  display:'0',prev:null,op:null,
+  justEvaled:false,sessionSteps:[],
+  sessionActive:false,_lastExpr:''
+};
+
+function fmtN(n){
+  if(n===null||n===undefined)return'';
+  if(Math.abs(n)>=1e10)return n.toExponential(3);
+  return parseFloat(n.toFixed(8)).toLocaleString('en-US',{maximumFractionDigits:4});
+}
+function fmtDisp(s){
+  if(!s||s==='-')return s;
+  var p=s.split('.');var i=parseInt(p[0],10);
+  if(isNaN(i))return s;
+  var r=i.toLocaleString('en-US');
+  if(p.length>1)r+='.'+p[1];
+  return r;
+}
+function evalOp(a,op,b){
+  if(op==='+')return a+b;
+  if(op==='−')return a-b;
+  if(op==='×')return a*b;
+  if(op==='÷')return b===0?null:a/b;
+  return b;
+}
+function paintCalc(){
+  var exEl=document.getElementById('calcExpr');
+  var reEl=document.getElementById('calcResult');
+  if(C.op&&C.prev!==null){
+    exEl.textContent=fmtN(C.prev)+' '+C.op+(C.display&&C.display!=='0'?' '+fmtDisp(C.display):'');
+  }else if(C.justEvaled){
+    exEl.textContent=C._lastExpr||'';
+  }else{
+    exEl.textContent='';
+  }
+  reEl.textContent=fmtDisp(C.display)||'0';
+}
+function calcNum(ch){
+  if(C.justEvaled){clearCalcSession();C.display='';C.prev=null;C.op=null;C.justEvaled=false;C._lastExpr='';}
+  if(ch==='.'){
+    if(C.display.includes('.'))return;
+    if(C.display===''||C.display==='-')C.display+='0';
+    C.display+='.';
+  }else{
+    if(C.display==='0'||C.display==='')C.display=ch;
+    else C.display+=ch;
+  }
+  paintCalc();
+}
+function calcOp(op){
+  if(C.display===''&&C.prev===null)return;
+  var cur=C.display!==''?parseFloat(C.display):null;
+  if(!C.sessionActive&&cur!==null){
+    C.sessionActive=true;C.prev=cur;pushStep(fmtN(cur),cur);
+  }else if(C.op&&cur!==null&&!C.justEvaled){
+    var res=evalOp(C.prev,C.op,cur);
+    if(res===null){calcFn('AC');showToast('除数不能为 0');return;}
+    pushStep(C.op+' '+fmtN(cur),res);C.prev=res;
+  }else if(C.justEvaled&&cur!==null){
+    C.prev=cur;pushStep(fmtN(cur),cur);
+  }
+  C.op=op;C.display='';C.justEvaled=false;paintCalc();
+}
+function calcEq(){
+  if(C.op===null||C.display==='')return;
+  var b=parseFloat(C.display);
+  var res=evalOp(C.prev,C.op,b);
+  if(res===null){calcFn('AC');showToast('除数不能为 0');return;}
+  pushStep(C.op+' '+fmtN(b),res);
+  C._lastExpr='= '+fmtN(res);
+  C.display=String(parseFloat(res.toFixed(8)));
+  C.prev=res;C.op=null;C.justEvaled=true;paintCalc();
+}
+function calcFn(fn){
+  if(fn==='AC'){
+    clearCalcSession();
+    C.display='0';C.prev=null;C.op=null;C.justEvaled=false;C._lastExpr='';C.sessionActive=false;
+    document.getElementById('calcExpr').textContent='';
+    document.getElementById('calcResult').textContent='0';
+    return;
+  }
+  if(fn==='DEL'){
+    if(C.justEvaled){calcFn('AC');return;}
+    C.display=C.display.length>1?C.display.slice(0,-1):'0';
+  }
+  if(fn==='%'){var v=parseFloat(C.display);if(!isNaN(v))C.display=String(v/100);}
+  paintCalc();
+}
+function clearCalcSession(){C.sessionSteps=[];renderCalcLog();}
+function pushStep(label,running){
+  C.sessionSteps.push({label:label,running:running});
+  renderCalcLog();
+  var log=document.getElementById('calcLog');
+  log.scrollTop=log.scrollHeight;
+}
+function renderCalcLog(){
+  var inner=document.getElementById('calcLog').querySelector('.calc-log-inner');
+  inner.querySelectorAll('.log-entry').forEach(function(e){e.remove();});
+  var empty=document.getElementById('calcLogEmpty');
+  if(!C.sessionSteps.length){empty.style.display='';return;}
+  empty.style.display='none';
+  C.sessionSteps.forEach(function(s){
+    var el=document.createElement('div');
+    el.className='log-entry';
+    el.innerHTML='<span class="log-step">'+s.label+'</span><span class="log-running">= K '+fmtN(s.running)+'</span>';
+    inner.appendChild(el);
+  });
+}
+function calcInjectValue(num){
+  clearCalcSession();
+  C.display=String(num);C.prev=null;C.op=null;C.justEvaled=false;C._lastExpr='';C.sessionActive=false;
+  paintCalc();
+  document.getElementById('calcResult').textContent=fmtN(num);
+}
+
+/* 动态键高：铺满 tab 栏上方 */
+window.addEventListener('resize',function(){});/* reserved */
+paintCalc();
+
+/* ══════════════════
+   TAB 3 · 钱仓
+══════════════════ */
+var vaultSign='+';
+var vaultData={balance:0,entries:[]};
+
+function loadVault(){
+  vaultData=lsGet('nenergy_vault_v5',{balance:0,entries:[]});
+  pruneVault(); /* hard-delete old entries, no balance change */
+  renderVault();
+}
+function saveVault(){lsSet('nenergy_vault_v5',vaultData);}
+
+/* Hard-delete entries older than 30 days — balance is NOT touched */
+function pruneVault(){
+  var cutoff=Date.now()-30*24*3600*1000;
+  vaultData.entries=(vaultData.entries||[]).filter(function(e){return e.ts>=cutoff;});
+}
+
+function selectSign(s){
+  vaultSign=s;
+  document.getElementById('signPlus').classList.toggle('sel',s==='+');
+  document.getElementById('signMinus').classList.toggle('sel',s==='-');
+}
+
+function vaultCommit(){
+  var raw=parseFloat(document.getElementById('vaultAmtInput').value);
+  if(!raw||raw<=0){showToast('请输入有效金额');return;}
+  var note=document.getElementById('vaultNoteInput').value.trim();
+  if(vaultSign==='-'&&(vaultData.balance||0)-raw<0){
+    showToast('余额不足，最多可支出 K '+fmt(vaultData.balance));return;
+  }
+  var delta=vaultSign==='+'?raw:-raw;
+  vaultData.balance=(vaultData.balance||0)+delta;
+  var now=new Date();
+  var dateStr=(now.getMonth()+1)+'月'+now.getDate()+'日';
+  vaultData.entries.unshift({
+    ts:Date.now(),
+    id:Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    date:dateStr,sign:vaultSign,amount:raw,note:note||''
+  });
+  /* Prune again after adding so list stays clean */
+  pruneVault();
+  saveVault();
+  document.getElementById('vaultAmtInput').value='';
+  document.getElementById('vaultNoteInput').value='';
+  renderVault();
+  showToast('钱仓已'+(vaultSign==='+'?'存入':'支出')+' K '+fmt(raw));
+}
+
+function deleteVaultEntry(id){
+  var entry=vaultData.entries.find(function(e){return e.id===id;});
+  if(!entry)return;
+  var delta=entry.sign==='+'?-entry.amount:entry.amount;
+  vaultData.balance=Math.max(0,(vaultData.balance||0)+delta);
+  vaultData.entries=vaultData.entries.filter(function(e){return e.id!==id;});
+  saveVault();renderVault();showToast('已删除该条记录');
+}
+
+function renderVault(){
+  document.getElementById('vaultBalance').textContent=fmt(Math.max(0,vaultData.balance||0));
+  var entries=vaultData.entries||[];
+  var lastEntry=vaultData.entries&&vaultData.entries.length?vaultData.entries[0]:null;
+  document.getElementById('vaultUpdated').textContent=lastEntry?'最后更新：'+lastEntry.date:'尚无记录';
+  var container=document.getElementById('vaultEntries');
+  if(!entries.length){container.innerHTML='<div class="vault-log-empty">近30天暂无流水</div>';return;}
+  container.innerHTML='';
+  entries.forEach(function(e){
+    var wrap=document.createElement('div');
+    wrap.className='vault-entry-wrap';
+    wrap.innerHTML=
+      '<div class="vault-entry-delete">删除</div>'+
+      '<div class="vault-entry" data-id="'+e.id+'">'+
+        '<div class="ve-left">'+
+          '<span class="ve-date">'+e.date+'</span>'+
+          (e.note?'<span class="ve-note">'+e.note+'</span>':'')+
+        '</div>'+
+        '<span class="ve-amount '+(e.sign==='+'?'ve-plus':'ve-minus')+'">'+(e.sign==='+'?'+':'−')+' K '+fmt(e.amount)+'</span>'+
+      '</div>';
+    container.appendChild(wrap);
+    attachSwipe(wrap,e.id);
+  });
+}
+
+function attachSwipe(wrap,id){
+  var card=wrap.querySelector('.vault-entry');
+  var sx=0,sy=0,dx=0,revealed=false,dragging=false;
+  var THRESHOLD=60;
+  card.addEventListener('touchstart',function(e){
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;
+    dx=0;dragging=true;card.style.transition='none';
+  },{passive:true});
+  card.addEventListener('touchmove',function(e){
+    if(!dragging)return;
+    var cx=e.touches[0].clientX,cy=e.touches[0].clientY;
+    var adx=Math.abs(cx-sx),ady=Math.abs(cy-sy);
+    if(!revealed&&ady>adx&&adx<5){dragging=false;return;}
+    dx=Math.max(-80,Math.min(0,cx-sx));
+    card.style.transform='translateX('+dx+'px)';
+  },{passive:true});
+  card.addEventListener('touchend',function(){
+    if(!dragging)return;dragging=false;
+    card.style.transition='transform 0.25s ease';
+    if(dx<-THRESHOLD){card.style.transform='translateX(-80px)';revealed=true;}
+    else{card.style.transform='translateX(0)';revealed=false;}
+  });
+  wrap.querySelector('.vault-entry-delete').addEventListener('click',function(){deleteVaultEntry(id);});
+  card.addEventListener('click',function(){
+    if(revealed){card.style.transition='transform 0.25s ease';card.style.transform='translateX(0)';revealed=false;}
+  });
+}
+
+loadVault();
+
+/* ── PWA Service Worker 注册 ── */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>

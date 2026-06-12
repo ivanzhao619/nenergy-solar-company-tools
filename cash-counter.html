@@ -1579,21 +1579,37 @@ function ledgerPreview(){
 function ledgerCommit(){
   var k=ledgerState.dateKey;
   var isZMW=ledgerState.currency==='ZMW';
-  var income=parseFloat(document.getElementById('lf-income').value)||0;
-  var expense=parseFloat(document.getElementById('lf-expense').value)||0;
+  /* 读取原始输入字符串，判断是否真的有输入（区分"空"和"0"）*/
+  var incomeStr=document.getElementById('lf-income').value.trim();
+  var expenseStr=document.getElementById('lf-expense').value.trim();
+  var extraStr=isZMW?document.getElementById('lf-extra').value.trim():'';
+  var income=parseFloat(incomeStr)||0;
+  var expense=parseFloat(expenseStr)||0;
   var expenseNote=document.getElementById('lf-expense-note').value.trim();
   var carry=parseFloat(document.getElementById('lf-carry').value)||0;
   var extra=0,extraNote='',incomeNote='';
   if(isZMW){
-    extra=parseFloat(document.getElementById('lf-extra').value)||0;
+    extra=parseFloat(extraStr)||0;
     extraNote=document.getElementById('lf-extra-note').value.trim();
   }else{
     incomeNote=document.getElementById('lf-income-note').value.trim();
   }
-  var net=income+extra-expense+carry;
+
+  /* 防重复提交：输入框全空时，若该日已有记录则提示已提交，不覆盖 */
+  var noInput=(incomeStr===''&&expenseStr===''&&extraStr===''&&!extraNote&&!expenseNote&&!incomeNote);
   var data=loadLedgerAll();
   if(!data.entries) data.entries={};
   var existed=!!data.entries[k];
+  if(noInput&&existed){
+    showToast('账目已提交');
+    return;
+  }
+  if(noInput&&!existed){
+    showToast('请先输入金额');
+    return;
+  }
+
+  var net=income+extra-expense+carry;
   data.entries[k]={
     income:income,extra:extra,expense:expense,carry:carry,net:net,
     extraNote:extraNote,expenseNote:expenseNote,incomeNote:incomeNote,

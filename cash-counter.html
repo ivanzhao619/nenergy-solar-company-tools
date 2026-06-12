@@ -498,21 +498,51 @@ body{
 }
 .ledger-export-panel.open{display:block;}
 .lep-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px;letter-spacing:0.04em;}
-.lep-select{
-  width:100%;background:var(--surface);border:1.5px solid var(--border);
-  border-radius:9px;color:var(--text);font-size:15px;font-weight:600;
-  padding:9px 12px;outline:none;font-family:inherit;margin-bottom:9px;
-  -webkit-appearance:none;appearance:none;
-}
-.lep-go-btn{
-  width:100%;border:none;border-radius:10px;padding:11px;
-  font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
-  background:linear-gradient(135deg,#2a5a2a,#3a7a3a);color:#c8f5a0;
+
+/* 主导出按钮：大、双币种 */
+.lep-primary-btn{
+  width:100%;border:none;border-radius:13px;padding:14px 16px;
+  cursor:pointer;font-family:inherit;
+  background:linear-gradient(135deg,#1a4a3a 0%,#2a6a4a 100%);
+  display:flex;align-items:center;gap:13px;text-align:left;
   transition:opacity 0.1s;
 }
-.lep-go-btn:active{opacity:0.78;}
-.lep-go-all{background:linear-gradient(135deg,#1a4a8a,#2a6acc);color:#c8e0ff;}
-.lep-hint{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.4;text-align:center;}
+.lep-primary-btn:active{opacity:0.8;}
+.lep-primary-icon{font-size:26px;flex-shrink:0;}
+.lep-primary-text{display:flex;flex-direction:column;gap:2px;}
+.lep-primary-title{font-size:15px;font-weight:800;color:#d8f5c8;}
+.lep-primary-sub{font-size:11px;color:rgba(200,245,160,0.6);font-weight:500;}
+
+/* 分隔线 */
+.lep-divider{
+  display:flex;align-items:center;text-align:center;
+  margin:13px 0 11px;
+}
+.lep-divider::before,.lep-divider::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+.lep-divider span{
+  padding:0 12px;font-size:10px;color:var(--muted);
+  font-weight:600;letter-spacing:0.05em;
+}
+
+/* 按月行：下拉 + 按钮并排 */
+.lep-month-row{display:flex;gap:8px;align-items:stretch;}
+.lep-select{
+  flex:1;background:var(--surface);border:1.5px solid var(--border);
+  border-radius:10px;color:var(--text);font-size:14px;font-weight:600;
+  padding:10px 12px;outline:none;font-family:inherit;
+  -webkit-appearance:none;appearance:none;
+}
+.lep-month-btn{
+  flex-shrink:0;border:none;border-radius:10px;padding:0 20px;
+  font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  background:var(--surface);border:1.5px solid var(--border);color:var(--text);
+  transition:all 0.1s;
+}
+.lep-month-btn:active{background:var(--accent);color:#1a0f00;border-color:var(--accent);}
+
+.lep-hint{font-size:10px;color:var(--muted);margin-top:11px;line-height:1.4;text-align:center;}
 
 /* 年月分组 */
 .lh-group-year{margin-bottom:6px;}
@@ -745,14 +775,27 @@ body{
       </div>
       <!-- 导出面板 -->
       <div class="ledger-export-panel" id="ledgerExportPanel">
-        <div class="lep-label">按月导出 Excel</div>
-        <select class="lep-select" id="ledgerExportSelect">
-          <option value="">— 选择月份 —</option>
-        </select>
-        <button class="lep-go-btn" onclick="ledgerExportXlsx('month')">📊 导出选中月份</button>
-        <div style="height:8px;"></div>
-        <button class="lep-go-btn lep-go-all" onclick="ledgerExportXlsx('all')">📦 导出全部历史</button>
-        <div class="lep-hint">导出后弹出系统菜单，选「存储到文件」可手动选择文件夹</div>
+        <!-- 主操作：导出全部（双币种） -->
+        <button class="lep-primary-btn" onclick="ledgerExportXlsx('all')">
+          <span class="lep-primary-icon">📦</span>
+          <span class="lep-primary-text">
+            <span class="lep-primary-title">导出全部历史</span>
+            <span class="lep-primary-sub">ZMW + USD 双币种总帐，一个文件</span>
+          </span>
+        </button>
+
+        <!-- 分隔 -->
+        <div class="lep-divider"><span>或按月导出</span></div>
+
+        <!-- 次操作：按月 -->
+        <div class="lep-month-row">
+          <select class="lep-select" id="ledgerExportSelect">
+            <option value="">选择月份…</option>
+          </select>
+          <button class="lep-month-btn" onclick="ledgerExportXlsx('month')">导出</button>
+        </div>
+
+        <div class="lep-hint">导出后弹出系统菜单，可「存储到文件」选文件夹或 AirDrop</div>
       </div>
       <div id="ledgerEntries"></div>
     </div>
@@ -1656,20 +1699,21 @@ function ledgerToggleExport(){
 
 function ledgerUpdateExportSelect(entries){
   var sel=document.getElementById('ledgerExportSelect');
-  var cur=ledgerState.currency;
   var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-  /* collect unique year-month combos */
+  /* 汇总 ZMW + USD 两个币种的所有年月 */
   var seen={};
-  Object.keys(entries||{}).sort(keyCompare).reverse().forEach(function(k){
+  var zmw=loadLedgerAll('ZMW').entries||{};
+  var usd=loadLedgerAll('USD').entries||{};
+  Object.keys(zmw).concat(Object.keys(usd)).forEach(function(k){
     var p=k.split('-');var ym=p[0]+'_'+p[1];
     if(!seen[ym]){seen[ym]={y:p[0],m:p[1]};}
   });
-  sel.innerHTML='<option value="">— 选择月份 —</option>';
+  sel.innerHTML='<option value="">选择月份…</option>';
   Object.keys(seen).sort(function(a,b){return b.localeCompare(a);}).forEach(function(ym){
     var s=seen[ym];
     var opt=document.createElement('option');
     opt.value=ym;
-    opt.textContent=s.y+'年 '+monthNames[parseInt(s.m)]+' ('+cur+')';
+    opt.textContent=s.y+'年 '+monthNames[parseInt(s.m)];
     sel.appendChild(opt);
   });
 }
@@ -1905,13 +1949,115 @@ function ledgerBuildRows(cur,keys,entries){
   return rows;
 }
 
-/* 主导出函数 mode='month'|'all' */
+/* 单月数据行（不含表头、不含月合计），供总表复用 */
+function ledgerMonthDataRows(cur,keys,entries){
+  var isZMW=cur==='ZMW';
+  var wd=['日','一','二','三','四','五','六'];
+  var rows=[];
+  var sumIncome=0,sumExtra=0,sumExpense=0,lastNet=0;
+  keys.forEach(function(k){
+    var e=entries[k];var p=k.split('-');
+    var d=keyToDate(k);
+    var dateStr=p[0]+'-'+p[1]+'-'+p[2]+'(周'+wd[d.getDay()]+')';
+    sumIncome+=e.income||0;sumExtra+=e.extra||0;sumExpense+=e.expense||0;lastNet=e.net||0;
+    if(isZMW){
+      rows.push([
+        {v:dateStr},{v:e.income||0,num:true},{v:e.extra||0,num:true},
+        {v:e.expense||0,num:true},{v:e.carry||0,num:true},{v:e.net||0,num:true},
+        {v:e.extraNote||''},{v:e.expenseNote||''}
+      ]);
+    }else{
+      rows.push([
+        {v:dateStr},{v:e.income||0,num:true},{v:e.expense||0,num:true},
+        {v:e.carry||0,num:true},{v:e.net||0,num:true},
+        {v:e.incomeNote||''},{v:e.expenseNote||''}
+      ]);
+    }
+  });
+  return {rows:rows,sumIncome:sumIncome,sumExtra:sumExtra,sumExpense:sumExpense,lastNet:lastNet};
+}
+
+/* 构建总表（全部历史，单 sheet）*/
+function ledgerBuildAllRows(cur,entries){
+  var isZMW=cur==='ZMW';
+  var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  var rows=[];
+  var allKeys=Object.keys(entries).sort(keyCompare); /* 旧→新 */
+  var ncols=isZMW?8:7;
+
+  /* 大标题 */
+  var titleRow=[{v:(isZMW?'ZMW':'USD')+'现金流水总帐',style:2}];
+  for(var i=1;i<ncols;i++) titleRow.push({v:''});
+  rows.push(titleRow);
+
+  /* 当前现金余额 = 最新一天的当日结余 */
+  var currentBalance=allKeys.length?(entries[allKeys[allKeys.length-1]].net||0):0;
+  var balRow=[{v:'当前现金余额',style:1},{v:currentBalance,num:true,style:1}];
+  for(var j=2;j<ncols;j++) balRow.push({v:''});
+  rows.push(balRow);
+
+  /* 空行 */
+  rows.push([]);
+
+  /* 表头 */
+  if(isZMW){
+    rows.push([
+      {v:'日期',style:1},{v:'营业额',style:1},{v:'额外收入',style:1},{v:'支出',style:1},
+      {v:'昨日结余',style:1},{v:'当日结余',style:1},{v:'额外收入备注',style:1},{v:'支出备注',style:1}
+    ]);
+  }else{
+    rows.push([
+      {v:'日期',style:1},{v:'收入',style:1},{v:'支出',style:1},
+      {v:'昨日结余',style:1},{v:'当日结余',style:1},{v:'收入备注',style:1},{v:'支出备注',style:1}
+    ]);
+  }
+
+  /* 按月分组（旧→新）*/
+  var byMonth={};
+  allKeys.forEach(function(k){
+    var p=k.split('-');var ym=p[0]+'-'+p[1];
+    if(!byMonth[ym])byMonth[ym]=[];
+    byMonth[ym].push(k);
+  });
+  var ymKeys=Object.keys(byMonth).sort(); /* 旧→新 */
+
+  ymKeys.forEach(function(ym,idx){
+    var p=ym.split('-');
+    /* 月小标题 */
+    var mTitle=[{v:'▾ '+p[0]+'年'+monthNames[parseInt(p[1])],style:1}];
+    for(var i=1;i<ncols;i++) mTitle.push({v:''});
+    rows.push(mTitle);
+
+    /* 当月数据（旧→新）*/
+    var md=ledgerMonthDataRows(cur,byMonth[ym],entries);
+    md.rows.forEach(function(r){rows.push(r);});
+
+    /* 当月结余行 */
+    if(isZMW){
+      rows.push([
+        {v:'当月结余',style:1},{v:md.sumIncome,num:true,style:1},{v:md.sumExtra,num:true,style:1},
+        {v:md.sumExpense,num:true,style:1},{v:''},{v:md.lastNet,num:true,style:1},{v:''},{v:''}
+      ]);
+    }else{
+      rows.push([
+        {v:'当月结余',style:1},{v:md.sumIncome,num:true,style:1},{v:md.sumExpense,num:true,style:1},
+        {v:''},{v:md.lastNet,num:true,style:1},{v:''},{v:''}
+      ]);
+    }
+    /* 月间空一行（最后一月不加）*/
+    if(idx<ymKeys.length-1) rows.push([]);
+  });
+
+  return rows;
+}
+
+/* 主导出函数 mode='month'|'all'  —— 一个文件含 ZMW + USD 两个分表 */
 function ledgerExportXlsx(mode){
-  var cur=ledgerState.currency;
-  var data=loadLedgerAll();
-  var entries=data.entries||{};
-  var allKeys=Object.keys(entries).sort(keyCompare);
-  if(!allKeys.length){showToast('暂无数据可导出');return;}
+  var zmwData=loadLedgerAll('ZMW').entries||{};
+  var usdData=loadLedgerAll('USD').entries||{};
+  var zmwKeys=Object.keys(zmwData);
+  var usdKeys=Object.keys(usdData);
+  if(!zmwKeys.length&&!usdKeys.length){showToast('暂无数据可导出');return;}
 
   var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
   var sheets=[],fileName='';
@@ -1921,26 +2067,22 @@ function ledgerExportXlsx(mode){
     if(!sel.value){showToast('请先选择月份');return;}
     var parts=sel.value.split('_');
     var year=parts[0],month=parts[1];
-    var keys=allKeys.filter(function(k){
-      var p=k.split('-');return p[0]===year&&p[1]===month;
-    });
-    if(!keys.length){showToast('该月无数据');return;}
-    sheets.push({name:year+'年'+month+'月',rows:ledgerBuildRows(cur,keys,entries)});
-    fileName=year+'年'+month+'月现金流水账_'+cur+'.xlsx';
+    function monthKeys(d){
+      return Object.keys(d).filter(function(k){
+        var p=k.split('-');return p[0]===year&&p[1]===month;
+      }).sort(keyCompare);
+    }
+    var zk=monthKeys(zmwData),uk=monthKeys(usdData);
+    if(!zk.length&&!uk.length){showToast('该月无数据');return;}
+    /* 两个分表，没有数据的币种也建空表保持结构一致 */
+    sheets.push({name:'ZMW '+year+'年'+month+'月',rows:ledgerBuildRows('ZMW',zk,zmwData)});
+    sheets.push({name:'USD '+year+'年'+month+'月',rows:ledgerBuildRows('USD',uk,usdData)});
+    fileName=year+'年'+month+'月现金流水账.xlsx';
   }else{
-    /* all: 每个月一个 sheet */
-    var byMonth={};
-    allKeys.forEach(function(k){
-      var p=k.split('-');var ym=p[0]+'-'+p[1];
-      if(!byMonth[ym])byMonth[ym]=[];
-      byMonth[ym].push(k);
-    });
-    Object.keys(byMonth).sort().forEach(function(ym){
-      var p=ym.split('-');
-      sheets.push({name:p[0]+'年'+p[1]+'月',rows:ledgerBuildRows(cur,byMonth[ym],entries)});
-    });
-    var firstK=allKeys[0].split('-'),lastK=allKeys[allKeys.length-1].split('-');
-    fileName='现金流水账全部历史_'+cur+'.xlsx';
+    /* all: ZMW 总帐 + USD 总帐 两个分表 */
+    sheets.push({name:'ZMW现金流水总帐',rows:ledgerBuildAllRows('ZMW',zmwData)});
+    sheets.push({name:'USD现金流水总帐',rows:ledgerBuildAllRows('USD',usdData)});
+    fileName='现金流水总帐.xlsx';
   }
 
   var xlsxBytes=buildXlsx(sheets);

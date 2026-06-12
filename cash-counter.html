@@ -1803,8 +1803,11 @@ function colLetter(n){ /* 1->A */
 }
 
 /* 把一个 sheet 的二维数组转 worksheet xml
-   rows: [[{v,num,style}...]...] */
-function buildSheetXml(rows){
+   sheet: {rows, cols:[width...], merges:['A1:H1'...]} */
+function buildSheetXml(sheet){
+  var rows=sheet.rows||[];
+  var cols=sheet.cols||null;
+  var merges=sheet.merges||null;
   var body='';
   for(var r=0;r<rows.length;r++){
     var cells=rows[r];
@@ -1818,9 +1821,28 @@ function buildSheetXml(rows){
     rowXml+='</row>';
     body+=rowXml;
   }
+  /* 列宽 */
+  var colsXml='';
+  if(cols&&cols.length){
+    colsXml='<cols>';
+    for(var ci=0;ci<cols.length;ci++){
+      colsXml+='<col min="'+(ci+1)+'" max="'+(ci+1)+'" width="'+cols[ci]+'" customWidth="1"/>';
+    }
+    colsXml+='</cols>';
+  }
+  /* 合并单元格 */
+  var mergeXml='';
+  if(merges&&merges.length){
+    mergeXml='<mergeCells count="'+merges.length+'">';
+    merges.forEach(function(m){ mergeXml+='<mergeCell ref="'+m+'"/>'; });
+    mergeXml+='</mergeCells>';
+  }
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<sheetData>'+body+'</sheetData></worksheet>';
+    colsXml+
+    '<sheetData>'+body+'</sheetData>'+
+    mergeXml+
+    '</worksheet>';
 }
 
 /* 构建完整 xlsx，sheets: [{name, rows}] */
@@ -1871,47 +1893,51 @@ function buildXlsx(sheets){
   files.push({name:'xl/styles.xml',data:strToU8(
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<fonts count="3">'+
+    '<fonts count="4">'+
     '<font><sz val="11"/><name val="Calibri"/></font>'+
     '<font><b/><sz val="11"/><name val="Calibri"/></font>'+
-    '<font><b/><sz val="14"/><name val="Calibri"/></font>'+
+    '<font><b/><sz val="15"/><color rgb="FFF5A623"/><name val="Calibri"/></font>'+
+    '<font><b/><sz val="11"/><color rgb="FFF5A623"/><name val="Calibri"/></font>'+
     '</fonts>'+
-    '<fills count="3"><fill><patternFill patternType="none"/></fill>'+
+    '<fills count="4"><fill><patternFill patternType="none"/></fill>'+
     '<fill><patternFill patternType="gray125"/></fill>'+
     '<fill><patternFill patternType="solid"><fgColor rgb="FF22263A"/></patternFill></fill>'+
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFEEF1F8"/></patternFill></fill>'+
     '</fills>'+
     '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'+
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-    '<cellXfs count="3">'+
+    '<cellXfs count="4">'+
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'+
+    '<xf numFmtId="0" fontId="3" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
     '</cellXfs>'+
     '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
     '</styleSheet>'
   )});
   /* worksheets */
   sheets.forEach(function(s,i){
-    files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:strToU8(buildSheetXml(s.rows))});
+    files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:strToU8(buildSheetXml(s))});
   });
   return zipFiles(files);
 }
 
-/* 把某个币种、某些日期 key 的数据转成 sheet rows */
+/* 把某个币种、某些日期 key 的数据转成 sheet 对象（按月导出用）*/
 function ledgerBuildRows(cur,keys,entries){
   var isZMW=cur==='ZMW';
   var rows=[];
+  var ncols=isZMW?7:6;
   /* 表头 */
   if(isZMW){
     rows.push([
-      {v:'日期'},{v:'营业额'},{v:'额外收入'},{v:'支出'},
-      {v:'昨日结余'},{v:'当日结余'},{v:'额外收入备注'},{v:'支出备注'}
-    ].map(function(c){c.style=1;return c;}));
+      {v:'日期',style:3},{v:'营业额',style:3},{v:'额外收入',style:3},{v:'支出',style:3},
+      {v:'当日结余',style:3},{v:'额外收入备注',style:3},{v:'支出备注',style:3}
+    ]);
   }else{
     rows.push([
-      {v:'日期'},{v:'收入'},{v:'支出'},
-      {v:'昨日结余'},{v:'当日结余'},{v:'收入备注'},{v:'支出备注'}
-    ].map(function(c){c.style=1;return c;}));
+      {v:'日期',style:3},{v:'收入',style:3},{v:'支出',style:3},
+      {v:'当日结余',style:3},{v:'收入备注',style:3},{v:'支出备注',style:3}
+    ]);
   }
   var wd=['日','一','二','三','四','五','六'];
   var sumIncome=0,sumExtra=0,sumExpense=0,lastNet=0;
@@ -1923,14 +1949,13 @@ function ledgerBuildRows(cur,keys,entries){
     if(isZMW){
       rows.push([
         {v:dateStr},{v:e.income||0,num:true},{v:e.extra||0,num:true},
-        {v:e.expense||0,num:true},{v:e.carry||0,num:true},{v:e.net||0,num:true},
+        {v:e.expense||0,num:true},{v:e.net||0,num:true},
         {v:e.extraNote||''},{v:e.expenseNote||''}
       ]);
     }else{
       rows.push([
         {v:dateStr},{v:e.income||0,num:true},{v:e.expense||0,num:true},
-        {v:e.carry||0,num:true},{v:e.net||0,num:true},
-        {v:e.incomeNote||''},{v:e.expenseNote||''}
+        {v:e.net||0,num:true},{v:e.incomeNote||''},{v:e.expenseNote||''}
       ]);
     }
   });
@@ -1938,15 +1963,21 @@ function ledgerBuildRows(cur,keys,entries){
   if(isZMW){
     rows.push([
       {v:'月合计',style:1},{v:sumIncome,num:true,style:1},{v:sumExtra,num:true,style:1},
-      {v:sumExpense,num:true,style:1},{v:''},{v:lastNet,num:true,style:1},{v:''},{v:''}
+      {v:sumExpense,num:true,style:1},{v:lastNet,num:true,style:1},{v:''},{v:''}
     ]);
   }else{
     rows.push([
       {v:'月合计',style:1},{v:sumIncome,num:true,style:1},{v:sumExpense,num:true,style:1},
-      {v:''},{v:lastNet,num:true,style:1},{v:''},{v:''}
+      {v:lastNet,num:true,style:1},{v:''},{v:''}
     ]);
   }
-  return rows;
+  return {rows:rows,cols:ledgerColWidths(isZMW),merges:[]};
+}
+
+/* 列宽定义 */
+function ledgerColWidths(isZMW){
+  if(isZMW) return [18,11,11,11,12,18,18];   /* 日期 营业额 额外 支出 当日结余 额外备注 支出备注 */
+  return [18,11,11,12,18,18];                /* 日期 收入 支出 当日结余 收入备注 支出备注 */
 }
 
 /* 单月数据行（不含表头、不含月合计），供总表复用 */
@@ -1963,14 +1994,13 @@ function ledgerMonthDataRows(cur,keys,entries){
     if(isZMW){
       rows.push([
         {v:dateStr},{v:e.income||0,num:true},{v:e.extra||0,num:true},
-        {v:e.expense||0,num:true},{v:e.carry||0,num:true},{v:e.net||0,num:true},
+        {v:e.expense||0,num:true},{v:e.net||0,num:true},
         {v:e.extraNote||''},{v:e.expenseNote||''}
       ]);
     }else{
       rows.push([
         {v:dateStr},{v:e.income||0,num:true},{v:e.expense||0,num:true},
-        {v:e.carry||0,num:true},{v:e.net||0,num:true},
-        {v:e.incomeNote||''},{v:e.expenseNote||''}
+        {v:e.net||0,num:true},{v:e.incomeNote||''},{v:e.expenseNote||''}
       ]);
     }
   });
@@ -1982,19 +2012,23 @@ function ledgerBuildAllRows(cur,entries){
   var isZMW=cur==='ZMW';
   var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
   var rows=[];
+  var merges=[];
   var allKeys=Object.keys(entries).sort(keyCompare); /* 旧→新 */
-  var ncols=isZMW?8:7;
+  var ncols=isZMW?7:6;
+  var lastColLetter=colLetter(ncols);
 
-  /* 大标题 */
+  /* 大标题（合并整行）*/
   var titleRow=[{v:(isZMW?'ZMW':'USD')+'现金流水总帐',style:2}];
   for(var i=1;i<ncols;i++) titleRow.push({v:''});
   rows.push(titleRow);
+  merges.push('A1:'+lastColLetter+'1');
 
-  /* 当前现金余额 = 最新一天的当日结余 */
+  /* 当前现金余额 = 最新一天的当日结余（标签占前2列合并，数值在第3列）*/
   var currentBalance=allKeys.length?(entries[allKeys[allKeys.length-1]].net||0):0;
-  var balRow=[{v:'当前现金余额',style:1},{v:currentBalance,num:true,style:1}];
-  for(var j=2;j<ncols;j++) balRow.push({v:''});
+  var balRow=[{v:'当前现金余额',style:1},{v:'',style:1},{v:currentBalance,num:true,style:1}];
+  for(var j=3;j<ncols;j++) balRow.push({v:''});
   rows.push(balRow);
+  merges.push('A2:B2');
 
   /* 空行 */
   rows.push([]);
@@ -2002,13 +2036,13 @@ function ledgerBuildAllRows(cur,entries){
   /* 表头 */
   if(isZMW){
     rows.push([
-      {v:'日期',style:1},{v:'营业额',style:1},{v:'额外收入',style:1},{v:'支出',style:1},
-      {v:'昨日结余',style:1},{v:'当日结余',style:1},{v:'额外收入备注',style:1},{v:'支出备注',style:1}
+      {v:'日期',style:3},{v:'营业额',style:3},{v:'额外收入',style:3},{v:'支出',style:3},
+      {v:'当日结余',style:3},{v:'额外收入备注',style:3},{v:'支出备注',style:3}
     ]);
   }else{
     rows.push([
-      {v:'日期',style:1},{v:'收入',style:1},{v:'支出',style:1},
-      {v:'昨日结余',style:1},{v:'当日结余',style:1},{v:'收入备注',style:1},{v:'支出备注',style:1}
+      {v:'日期',style:3},{v:'收入',style:3},{v:'支出',style:3},
+      {v:'当日结余',style:3},{v:'收入备注',style:3},{v:'支出备注',style:3}
     ]);
   }
 
@@ -2023,10 +2057,12 @@ function ledgerBuildAllRows(cur,entries){
 
   ymKeys.forEach(function(ym,idx){
     var p=ym.split('-');
-    /* 月小标题 */
+    /* 月小标题（合并整行）*/
+    var rowIdx=rows.length+1; /* 1-based row number for this title */
     var mTitle=[{v:'▾ '+p[0]+'年'+monthNames[parseInt(p[1])],style:1}];
     for(var i=1;i<ncols;i++) mTitle.push({v:''});
     rows.push(mTitle);
+    merges.push('A'+rowIdx+':'+lastColLetter+rowIdx);
 
     /* 当月数据（旧→新）*/
     var md=ledgerMonthDataRows(cur,byMonth[ym],entries);
@@ -2036,19 +2072,19 @@ function ledgerBuildAllRows(cur,entries){
     if(isZMW){
       rows.push([
         {v:'当月结余',style:1},{v:md.sumIncome,num:true,style:1},{v:md.sumExtra,num:true,style:1},
-        {v:md.sumExpense,num:true,style:1},{v:''},{v:md.lastNet,num:true,style:1},{v:''},{v:''}
+        {v:md.sumExpense,num:true,style:1},{v:md.lastNet,num:true,style:1},{v:''},{v:''}
       ]);
     }else{
       rows.push([
         {v:'当月结余',style:1},{v:md.sumIncome,num:true,style:1},{v:md.sumExpense,num:true,style:1},
-        {v:''},{v:md.lastNet,num:true,style:1},{v:''},{v:''}
+        {v:md.lastNet,num:true,style:1},{v:''},{v:''}
       ]);
     }
     /* 月间空一行（最后一月不加）*/
     if(idx<ymKeys.length-1) rows.push([]);
   });
 
-  return rows;
+  return {rows:rows,cols:ledgerColWidths(isZMW),merges:merges};
 }
 
 /* 主导出函数 mode='month'|'all'  —— 一个文件含 ZMW + USD 两个分表 */
@@ -2075,13 +2111,17 @@ function ledgerExportXlsx(mode){
     var zk=monthKeys(zmwData),uk=monthKeys(usdData);
     if(!zk.length&&!uk.length){showToast('该月无数据');return;}
     /* 两个分表，没有数据的币种也建空表保持结构一致 */
-    sheets.push({name:'ZMW '+year+'年'+month+'月',rows:ledgerBuildRows('ZMW',zk,zmwData)});
-    sheets.push({name:'USD '+year+'年'+month+'月',rows:ledgerBuildRows('USD',uk,usdData)});
+    var zSheet=ledgerBuildRows('ZMW',zk,zmwData);
+    var uSheet=ledgerBuildRows('USD',uk,usdData);
+    sheets.push({name:'ZMW '+year+'年'+month+'月',rows:zSheet.rows,cols:zSheet.cols,merges:zSheet.merges});
+    sheets.push({name:'USD '+year+'年'+month+'月',rows:uSheet.rows,cols:uSheet.cols,merges:uSheet.merges});
     fileName=year+'年'+month+'月现金流水账.xlsx';
   }else{
     /* all: ZMW 总帐 + USD 总帐 两个分表 */
-    sheets.push({name:'ZMW现金流水总帐',rows:ledgerBuildAllRows('ZMW',zmwData)});
-    sheets.push({name:'USD现金流水总帐',rows:ledgerBuildAllRows('USD',usdData)});
+    var zAll=ledgerBuildAllRows('ZMW',zmwData);
+    var uAll=ledgerBuildAllRows('USD',usdData);
+    sheets.push({name:'ZMW现金流水总帐',rows:zAll.rows,cols:zAll.cols,merges:zAll.merges});
+    sheets.push({name:'USD现金流水总帐',rows:uAll.rows,cols:uAll.cols,merges:uAll.merges});
     fileName='现金流水总帐.xlsx';
   }
 

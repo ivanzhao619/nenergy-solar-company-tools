@@ -257,6 +257,21 @@ body{
 
 /* ══ TAB 3 · 钱仓 ══ */
 #page-vault{background:var(--bg);}
+.vault-date-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:9px;background:var(--surface);border-radius:11px;
+  border:1.5px solid var(--border);padding:6px 8px;
+}
+.vdn-arrow{
+  width:34px;height:34px;border:none;background:var(--card);
+  border-radius:8px;color:var(--text);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-family:inherit;flex-shrink:0;transition:background 0.1s;
+}
+.vdn-arrow:active{background:var(--border);}
+.vdn-arrow:disabled{opacity:0.25;}
+.vdn-center{flex:1;text-align:center;}
+.vdn-date{font-size:15px;font-weight:700;color:var(--text);}
 .vault-balance-card{
   margin:14px 13px 0;
   background:linear-gradient(135deg,#1a2e1a 0%,#2a3822 100%);
@@ -543,6 +558,9 @@ body{
 .lep-month-btn:active{background:var(--accent);color:#1a0f00;border-color:var(--accent);}
 
 .lep-hint{font-size:10px;color:var(--muted);margin-top:11px;line-height:1.4;text-align:center;}
+.lep-import-btn{background:linear-gradient(135deg,#1a3a5a 0%,#2a5a8a 100%);}
+.lep-import-btn .lep-primary-title{color:#c8e0f5;}
+.lep-import-btn .lep-primary-sub{color:rgba(160,200,245,0.6);}
 
 /* 年月分组 */
 .lh-group-year{margin-bottom:6px;}
@@ -565,6 +583,13 @@ body{
 .lh-group-month-label{font-size:12px;font-weight:700;color:var(--muted);}
 .lh-group-month-right{display:flex;align-items:center;gap:7px;}
 .lh-group-month-chevron{color:var(--muted);font-size:10px;transition:transform 0.2s;}
+.lh-group-month-left{display:flex;align-items:center;gap:8px;}
+.lh-month-del-btn{
+  background:none;border:none;font-size:13px;cursor:pointer;
+  padding:2px 4px;opacity:0.5;font-family:inherit;line-height:1;
+  transition:opacity 0.1s;
+}
+.lh-month-del-btn:active{opacity:1;}
 .lh-group-month-body{display:none;padding-left:8px;}
 .lh-group-month-body.open{display:block;}
 
@@ -661,6 +686,14 @@ body{
       <div class="vb-updated" id="vaultUpdated">尚无记录</div>
     </div>
     <div class="vault-input-area">
+      <!-- 日期导航 -->
+      <div class="vault-date-nav">
+        <button class="vdn-arrow" id="vaultDatePrev" onclick="vaultNavDay(-1)">‹</button>
+        <div class="vdn-center">
+          <span class="vdn-date" id="vaultDateText">今天</span>
+        </div>
+        <button class="vdn-arrow" id="vaultDateNext" onclick="vaultNavDay(1)" disabled>›</button>
+      </div>
       <div class="vault-input-row">
         <button class="vault-sign-btn vs-plus sel" id="signPlus" onclick="selectSign('+')">+</button>
         <button class="vault-sign-btn vs-minus" id="signMinus" onclick="selectSign('-')">−</button>
@@ -771,8 +804,25 @@ body{
     <div class="ledger-history">
       <div class="ledger-history-header">
         <div class="ledger-history-title" id="ledgerHistoryTitle">历史日报 · ZMW</div>
-        <button class="ledger-export-btn" onclick="ledgerToggleExport()">⬇ 导出</button>
+        <div style="display:flex;gap:8px;">
+          <button class="ledger-export-btn" onclick="ledgerToggleImport()">⬆ 导入</button>
+          <button class="ledger-export-btn" onclick="ledgerToggleExport()">⬇ 导出</button>
+        </div>
       </div>
+
+      <!-- 导入面板 -->
+      <div class="ledger-export-panel" id="ledgerImportPanel">
+        <button class="lep-primary-btn lep-import-btn" onclick="document.getElementById('ledgerImportFile').click()">
+          <span class="lep-primary-icon">📥</span>
+          <span class="lep-primary-text">
+            <span class="lep-primary-title">导入 Excel 文件</span>
+            <span class="lep-primary-sub">选择之前导出的「现金流水总帐」文件</span>
+          </span>
+        </button>
+        <input type="file" id="ledgerImportFile" accept=".xlsx" style="display:none;" onchange="ledgerHandleImportFile(this)">
+        <div class="lep-hint">重叠日期以导入文件为准（覆盖本地）。导入前会提示确认。</div>
+      </div>
+
       <!-- 导出面板 -->
       <div class="ledger-export-panel" id="ledgerExportPanel">
         <!-- 主操作：导出全部（双币种） -->
@@ -1147,18 +1197,61 @@ paintCalc();
 ══════════════════ */
 var vaultSign='+';
 var vaultData={balance:0,entries:[]};
+var vaultDateKey=''; /* 选中的记账日期 YYYY-M-D */
+
+function vaultTodayKey(){
+  var d=new Date();
+  return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+}
+function vaultKeyToDate(k){var p=k.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);}
+function vaultDateCompare(a,b){return vaultKeyToDate(a)-vaultKeyToDate(b);}
+function vaultKeyAddDays(k,n){var d=vaultKeyToDate(k);d.setDate(d.getDate()+n);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function vaultKeyLabel(k){
+  var tk=vaultTodayKey();
+  if(k===tk) return '今天';
+  if(k===vaultKeyAddDays(tk,-1)) return '昨天';
+  var d=vaultKeyToDate(k);
+  var wd=['日','一','二','三','四','五','六'];
+  return (d.getMonth()+1)+'月'+d.getDate()+'日 (周'+wd[d.getDay()]+')';
+}
+
+function vaultRenderDateNav(){
+  if(!vaultDateKey) vaultDateKey=vaultTodayKey();
+  document.getElementById('vaultDateText').textContent=vaultKeyLabel(vaultDateKey);
+  /* 未来不可选 */
+  document.getElementById('vaultDateNext').disabled=(vaultDateKey===vaultTodayKey());
+  /* 过去最多30天 */
+  var minKey=vaultKeyAddDays(vaultTodayKey(),-30);
+  document.getElementById('vaultDatePrev').disabled=(vaultDateCompare(vaultDateKey,minKey)<=0);
+}
+function vaultNavDay(delta){
+  var next=vaultKeyAddDays(vaultDateKey,delta);
+  var tk=vaultTodayKey();
+  var minKey=vaultKeyAddDays(tk,-30);
+  if(vaultDateCompare(next,tk)>0) return;       /* 不能到未来 */
+  if(vaultDateCompare(next,minKey)<0) return;    /* 不能超过30天前 */
+  vaultDateKey=next;
+  vaultRenderDateNav();
+}
 
 function loadVault(){
   vaultData=lsGet('nenergy_vault_v5',{balance:0,entries:[]});
   pruneVault(); /* hard-delete old entries, no balance change */
+  vaultDateKey=vaultTodayKey();
+  vaultRenderDateNav();
   renderVault();
 }
 function saveVault(){lsSet('nenergy_vault_v5',vaultData);}
 
-/* Hard-delete entries older than 30 days — balance is NOT touched */
+/* Hard-delete entries older than 30 days — balance is NOT touched.
+   按记账日期（dateKey）判断，兼容旧数据（无 dateKey 时退回 ts） */
 function pruneVault(){
-  var cutoff=Date.now()-30*24*3600*1000;
-  vaultData.entries=(vaultData.entries||[]).filter(function(e){return e.ts>=cutoff;});
+  var minKey=vaultKeyAddDays(vaultTodayKey(),-30);
+  var cutoffTs=Date.now()-30*24*3600*1000;
+  vaultData.entries=(vaultData.entries||[]).filter(function(e){
+    if(e.dateKey) return vaultDateCompare(e.dateKey,minKey)>=0;
+    return e.ts>=cutoffTs;
+  });
 }
 
 function selectSign(s){
@@ -1176,14 +1269,15 @@ function vaultCommit(){
   }
   var delta=vaultSign==='+'?raw:-raw;
   vaultData.balance=(vaultData.balance||0)+delta;
-  var now=new Date();
-  var dateStr=(now.getMonth()+1)+'月'+now.getDate()+'日';
-  vaultData.entries.unshift({
+  var dk=vaultDateKey||vaultTodayKey();
+  var d=vaultKeyToDate(dk);
+  var dateStr=(d.getMonth()+1)+'月'+d.getDate()+'日';
+  vaultData.entries.push({
     ts:Date.now(),
+    dateKey:dk,
     id:Date.now()+'_'+Math.random().toString(36).slice(2,7),
     date:dateStr,sign:vaultSign,amount:raw,note:note||''
   });
-  /* Prune again after adding so list stays clean */
   pruneVault();
   saveVault();
   document.getElementById('vaultAmtInput').value='';
@@ -1203,8 +1297,14 @@ function deleteVaultEntry(id){
 
 function renderVault(){
   document.getElementById('vaultBalance').textContent=fmt(Math.max(0,vaultData.balance||0));
-  var entries=vaultData.entries||[];
-  var lastEntry=vaultData.entries&&vaultData.entries.length?vaultData.entries[0]:null;
+  /* 按记账日期倒序排列（新→旧），同日按录入时间倒序 */
+  var entries=(vaultData.entries||[]).slice().sort(function(a,b){
+    var ak=a.dateKey||vaultTodayKey(), bk=b.dateKey||vaultTodayKey();
+    var dc=vaultDateCompare(bk,ak);
+    if(dc!==0) return dc;
+    return (b.ts||0)-(a.ts||0);
+  });
+  var lastEntry=entries.length?entries[0]:null;
   document.getElementById('vaultUpdated').textContent=lastEntry?'最后更新：'+lastEntry.date:'尚无记录';
   var container=document.getElementById('vaultEntries');
   if(!entries.length){container.innerHTML='<div class="vault-log-empty">近30天暂无流水</div>';return;}
@@ -1530,6 +1630,26 @@ function ledgerDeleteEntry(k){
   showToast('已删除 '+keyToLabel(k));
 }
 
+/* 删除整月（当前币种）*/
+function ledgerDeleteMonth(y,m){
+  var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  var data=loadLedgerAll();
+  var entries=data.entries||{};
+  var toDelete=Object.keys(entries).filter(function(k){
+    var p=k.split('-');return p[0]===y&&p[1]===m;
+  });
+  if(!toDelete.length){return;}
+  var msg='确认删除 '+y+'年'+monthNames[parseInt(m)]+' 的全部 '+toDelete.length+' 条记录（'+ledgerState.currency+'）？\n此操作不可撤销。';
+  if(!confirm(msg)) return;
+  toDelete.forEach(function(k){delete entries[k];});
+  data.entries=entries;
+  saveLedgerAll(data);
+  ledgerCascade(ledgerState.currency);
+  ledgerLoadDateIntoForm(ledgerState.dateKey);
+  ledgerRenderHistory();
+  showToast('已删除 '+monthNames[parseInt(m)]+' 全月记录');
+}
+
 /* ── 点击历史条目 → 跳转到该日期 ── */
 function ledgerJumpToDate(k){
   ledgerState.dateKey=k;
@@ -1612,10 +1732,21 @@ function ledgerRenderHistory(){
       var mHead=document.createElement('div');
       mHead.className='lh-group-month-head';
       mHead.innerHTML=
-        '<span class="lh-group-month-label">'+monthNames[parseInt(m)]+'</span>'+
+        '<div class="lh-group-month-left">'+
+          '<button class="lh-month-del-btn" data-y="'+y+'" data-m="'+m+'">🗑</button>'+
+          '<span class="lh-group-month-label">'+monthNames[parseInt(m)]+'</span>'+
+        '</div>'+
         '<div class="lh-group-month-right">'+
           '<span class="lh-group-month-chevron">▾</span>'+
         '</div>';
+      /* 删除按钮单独绑定，阻止冒泡到折叠 */
+      (function(yy,mm){
+        var delBtn=mHead.querySelector('.lh-month-del-btn');
+        delBtn.onclick=function(ev){
+          ev.stopPropagation();
+          ledgerDeleteMonth(yy,mm);
+        };
+      })(y,m);
 
       var mBody=document.createElement('div');
       var isCurrentMonth=(y===thisYear&&m===thisMonth);
@@ -1694,7 +1825,12 @@ function toggleLedgerCard(headEl){
 
 /* ── 导出面板 ── */
 function ledgerToggleExport(){
+  document.getElementById('ledgerImportPanel').classList.remove('open');
   document.getElementById('ledgerExportPanel').classList.toggle('open');
+}
+function ledgerToggleImport(){
+  document.getElementById('ledgerExportPanel').classList.remove('open');
+  document.getElementById('ledgerImportPanel').classList.toggle('open');
 }
 
 function ledgerUpdateExportSelect(entries){
@@ -2149,13 +2285,211 @@ function ledgerFallbackDownload(blob,fileName){
   setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
 }
 
-function csvQ(s){
-  s=String(s||'');
-  if(s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0){
-    return '"'+s.replace(/"/g,'""')+'"';
+/* ══════════════════════════════════════
+   导入 XLSX（解压 + 解析 + 合并）
+   重叠日期以导入文件为准
+══════════════════════════════════════ */
+
+/* 读取 ZIP，返回 {filename: Uint8Array}（支持 store 和 deflate）*/
+function unzip(bytes){
+  var dv=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  var files={};
+  var i=0;
+  var promises=[];
+  while(i<bytes.length-4){
+    var sig=dv.getUint32(i,true);
+    if(sig!==0x04034b50) break; /* 到中央目录就停 */
+    var method=dv.getUint16(i+8,true);
+    var compSize=dv.getUint32(i+18,true);
+    var nameLen=dv.getUint16(i+26,true);
+    var extraLen=dv.getUint16(i+28,true);
+    var nameStart=i+30;
+    var name=new TextDecoder().decode(bytes.subarray(nameStart,nameStart+nameLen));
+    var dataStart=nameStart+nameLen+extraLen;
+    var comp=bytes.subarray(dataStart,dataStart+compSize);
+    files[name]={method:method,data:comp};
+    i=dataStart+compSize;
   }
-  return s;
+  return files;
 }
+
+/* 解压单个条目（store 直接返回，deflate 用 DecompressionStream）*/
+function inflateEntry(entry){
+  if(entry.method===0){
+    return Promise.resolve(new TextDecoder().decode(entry.data));
+  }
+  /* method 8 = deflate raw */
+  if(typeof DecompressionStream==='undefined'){
+    return Promise.reject(new Error('当前浏览器不支持解压该文件，请用本工具导出的文件'));
+  }
+  var ds=new DecompressionStream('deflate-raw');
+  var blob=new Blob([entry.data]);
+  return new Response(blob.stream().pipeThrough(ds)).arrayBuffer().then(function(buf){
+    return new TextDecoder().decode(new Uint8Array(buf));
+  });
+}
+
+/* 从 worksheet xml 解析出二维字符串数组 */
+function parseSheetXml(xml){
+  var rows=[];
+  var rowRe=/<row[^>]*>([\s\S]*?)<\/row>/g;
+  var m;
+  while((m=rowRe.exec(xml))){
+    var rowContent=m[1];
+    var cells={};
+    /* 拆出每个 <c ...>...</c> 或自闭合 <c .../> */
+    var cellRe=/<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g;
+    var cm;
+    while((cm=cellRe.exec(rowContent))){
+      var attrs=cm[1]||'';
+      var inner=cm[2]||'';
+      var refMatch=attrs.match(/r="([A-Z]+)\d+"/);
+      if(!refMatch) continue;
+      var colNum=colToNum(refMatch[1]);
+      var isInline=/t="inlineStr"/.test(attrs);
+      var val='';
+      if(isInline){
+        var tMatch=inner.match(/<t[^>]*>([\s\S]*?)<\/t>/);
+        val=tMatch?xmlUnesc(tMatch[1]):'';
+      }else{
+        var vMatch=inner.match(/<v>([\s\S]*?)<\/v>/);
+        val=vMatch?vMatch[1]:'';
+      }
+      cells[colNum]=val;
+    }
+    rows.push(cells);
+  }
+  return rows;
+}
+function colToNum(s){var n=0;for(var i=0;i<s.length;i++)n=n*26+(s.charCodeAt(i)-64);return n;}
+function xmlUnesc(s){
+  return String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&amp;/g,'&');
+}
+
+/* 从解析的行里提取记账数据。返回 {ZMW:{key:entry}, USD:{key:entry}} */
+function extractEntriesFromSheets(sheetRows,sheetName){
+  /* 判断币种：sheet 名含 USD → USD，否则 ZMW */
+  var isUSD=/USD/i.test(sheetName);
+  var result={};
+  sheetRows.forEach(function(cells){
+    var c1=(cells[1]||'').trim();
+    /* 数据行的第一列是日期，形如 2026-6-12(周五) */
+    var dm=c1.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if(!dm) return; /* 跳过标题/表头/合计/月份行 */
+    var key=parseInt(dm[1])+'-'+parseInt(dm[2])+'-'+parseInt(dm[3]);
+    if(isUSD){
+      /* 日期,收入,支出,当日结余,收入备注,支出备注 */
+      var income=parseFloat(cells[2])||0;
+      var expense=parseFloat(cells[3])||0;
+      var net=parseFloat(cells[4]);
+      result[key]={
+        income:income,extra:0,expense:expense,
+        carry:0,net:isNaN(net)?(income-expense):net,
+        incomeNote:(cells[5]||'').trim(),expenseNote:(cells[6]||'').trim(),extraNote:'',
+        ts:Date.now()
+      };
+    }else{
+      /* 日期,营业额,额外收入,支出,当日结余,额外备注,支出备注 */
+      var inc=parseFloat(cells[2])||0;
+      var ext=parseFloat(cells[3])||0;
+      var exp=parseFloat(cells[4])||0;
+      var nt=parseFloat(cells[5]);
+      result[key]={
+        income:inc,extra:ext,expense:exp,
+        carry:0,net:isNaN(nt)?(inc+ext-exp):nt,
+        extraNote:(cells[6]||'').trim(),expenseNote:(cells[7]||'').trim(),incomeNote:'',
+        ts:Date.now()
+      };
+    }
+  });
+  return result;
+}
+
+function ledgerHandleImportFile(input){
+  var file=input.files&&input.files[0];
+  if(!file){return;}
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var bytes=new Uint8Array(e.target.result);
+    input.value=''; /* 允许重复选同一文件 */
+    ledgerProcessImport(bytes);
+  };
+  reader.onerror=function(){showToast('文件读取失败');input.value='';};
+  reader.readAsArrayBuffer(file);
+}
+
+function ledgerProcessImport(bytes){
+  var files;
+  try{ files=unzip(bytes); }
+  catch(err){ showToast('文件格式错误，无法解析'); return; }
+
+  /* 找 workbook 里的 sheet 名映射 */
+  var wbXml=null,relsXml=null;
+  var sheetEntries=[]; /* {name, partName} */
+
+  /* 先收集所有 worksheet 文件名 */
+  var sheetFiles=Object.keys(files).filter(function(n){return /^xl\/worksheets\/sheet\d+\.xml$/.test(n);});
+
+  /* 解析 workbook.xml 拿 sheet 名顺序 */
+  inflateEntry(files['xl/workbook.xml']).then(function(wb){
+    var names=[];
+    var re=/<sheet [^>]*name="([^"]*)"[^>]*\/>/g,m;
+    while((m=re.exec(wb))) names.push(xmlUnesc(m[1]));
+    /* 逐个 sheet 解压解析 */
+    var tasks=sheetFiles.sort().map(function(sf,idx){
+      return inflateEntry(files[sf]).then(function(xml){
+        return {name:names[idx]||sf,rows:parseSheetXml(xml)};
+      });
+    });
+    return Promise.all(tasks);
+  }).then(function(sheets){
+    /* 提取双币种数据 */
+    var imported={ZMW:{},USD:{}};
+    sheets.forEach(function(s){
+      var isUSD=/USD/i.test(s.name);
+      var ext=extractEntriesFromSheets(s.rows,s.name);
+      var bucket=isUSD?imported.USD:imported.ZMW;
+      Object.keys(ext).forEach(function(k){bucket[k]=ext[k];});
+    });
+
+    var zCount=Object.keys(imported.ZMW).length;
+    var uCount=Object.keys(imported.USD).length;
+    if(zCount===0&&uCount===0){
+      showToast('未在文件中找到有效记账数据');
+      return;
+    }
+
+    /* 统计重叠 / 新增 */
+    var zLocal=loadLedgerAll('ZMW').entries||{};
+    var uLocal=loadLedgerAll('USD').entries||{};
+    var zOverlap=0,zNew=0,uOverlap=0,uNew=0;
+    Object.keys(imported.ZMW).forEach(function(k){ if(zLocal[k])zOverlap++;else zNew++; });
+    Object.keys(imported.USD).forEach(function(k){ if(uLocal[k])uOverlap++;else uNew++; });
+
+    var msg='即将导入：\n'+
+      'ZMW：新增 '+zNew+' 条，覆盖 '+zOverlap+' 条\n'+
+      'USD：新增 '+uNew+' 条，覆盖 '+uOverlap+' 条\n\n'+
+      '重叠日期将以导入文件为准。确认导入？';
+    if(!confirm(msg)) return;
+
+    /* 合并写入：导入覆盖本地 */
+    Object.keys(imported.ZMW).forEach(function(k){zLocal[k]=imported.ZMW[k];});
+    Object.keys(imported.USD).forEach(function(k){uLocal[k]=imported.USD[k];});
+    saveLedgerAll({entries:zLocal},'ZMW');
+    saveLedgerAll({entries:uLocal},'USD');
+    /* 重算级联（昨日结余链）*/
+    ledgerCascade('ZMW');
+    ledgerCascade('USD');
+
+    showToast('导入完成：ZMW '+(zNew+zOverlap)+' · USD '+(uNew+uOverlap)+' 条');
+    document.getElementById('ledgerImportPanel').classList.remove('open');
+    /* 刷新当前视图 */
+    ledgerInit();
+  }).catch(function(err){
+    showToast('导入失败：'+(err.message||'文件解析错误'));
+  });
+}
+
 
 function escHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

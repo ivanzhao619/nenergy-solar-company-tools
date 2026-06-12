@@ -248,7 +248,7 @@ body{
   display:flex;align-items:center;justify-content:center;
   transition:transform 0.07s,opacity 0.07s;font-family:inherit;
 }
-.key:active{transform:scale(0.91);opacity:0.75;}
+.key:active,.key.key-pressed{transform:scale(0.91);opacity:0.75;}
 .key-num{background:var(--card);color:var(--text);}
 .key-op{background:#252038;color:#c0a0ff;}
 .key-fn{background:#20222e;color:var(--muted);font-size:14px;}
@@ -511,6 +511,8 @@ body{
   transition:opacity 0.1s;
 }
 .lep-go-btn:active{opacity:0.78;}
+.lep-go-all{background:linear-gradient(135deg,#1a4a8a,#2a6acc);color:#c8e0ff;}
+.lep-hint{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.4;text-align:center;}
 
 /* 年月分组 */
 .lh-group-year{margin-bottom:6px;}
@@ -532,7 +534,6 @@ body{
 }
 .lh-group-month-label{font-size:12px;font-weight:700;color:var(--muted);}
 .lh-group-month-right{display:flex;align-items:center;gap:7px;}
-.lh-group-month-net{font-size:12px;font-weight:700;}
 .lh-group-month-chevron{color:var(--muted);font-size:10px;transition:transform 0.2s;}
 .lh-group-month-body{display:none;padding-left:8px;}
 .lh-group-month-body.open{display:block;}
@@ -594,26 +595,26 @@ body{
     </div>
   </div>
   <div class="calc-keys" id="calcKeys">
-    <button class="key key-fn"  onclick="calcFn('AC')">AC</button>
-    <button class="key key-fn key-del" onclick="calcFn('DEL')">⌫</button>
-    <button class="key key-fn"  onclick="calcFn('%')">%</button>
-    <button class="key key-op"  onclick="calcOp('÷')">÷</button>
-    <button class="key key-num" onclick="calcNum('7')">7</button>
-    <button class="key key-num" onclick="calcNum('8')">8</button>
-    <button class="key key-num" onclick="calcNum('9')">9</button>
-    <button class="key key-op"  onclick="calcOp('×')">×</button>
-    <button class="key key-num" onclick="calcNum('4')">4</button>
-    <button class="key key-num" onclick="calcNum('5')">5</button>
-    <button class="key key-num" onclick="calcNum('6')">6</button>
-    <button class="key key-op"  onclick="calcOp('−')">−</button>
-    <button class="key key-num" onclick="calcNum('1')">1</button>
-    <button class="key key-num" onclick="calcNum('2')">2</button>
-    <button class="key key-num" onclick="calcNum('3')">3</button>
-    <button class="key key-op"  onclick="calcOp('+')">+</button>
-    <button class="key key-num" onclick="calcNum('0')">0</button>
-    <button class="key key-num" onclick="calcNum('00')" style="font-size:18px;">00</button>
-    <button class="key key-num" onclick="calcNum('.')">.</button>
-    <button class="key key-eq"  onclick="calcEq()">=</button>
+    <button class="key key-fn"  data-action="fn:AC">AC</button>
+    <button class="key key-fn key-del" data-action="fn:DEL">⌫</button>
+    <button class="key key-fn"  data-action="fn:%">%</button>
+    <button class="key key-op"  data-action="op:÷">÷</button>
+    <button class="key key-num" data-action="num:7">7</button>
+    <button class="key key-num" data-action="num:8">8</button>
+    <button class="key key-num" data-action="num:9">9</button>
+    <button class="key key-op"  data-action="op:×">×</button>
+    <button class="key key-num" data-action="num:4">4</button>
+    <button class="key key-num" data-action="num:5">5</button>
+    <button class="key key-num" data-action="num:6">6</button>
+    <button class="key key-op"  data-action="op:−">−</button>
+    <button class="key key-num" data-action="num:1">1</button>
+    <button class="key key-num" data-action="num:2">2</button>
+    <button class="key key-num" data-action="num:3">3</button>
+    <button class="key key-op"  data-action="op:+">+</button>
+    <button class="key key-num" data-action="num:0">0</button>
+    <button class="key key-num" data-action="num:00" style="font-size:18px;">00</button>
+    <button class="key key-num" data-action="num:.">.</button>
+    <button class="key key-eq"  data-action="eq">=</button>
   </div>
 </div>
 
@@ -694,6 +695,9 @@ body{
           <span class="lfr-prefix" id="pfx-income">K</span>
           <input class="lfr-input" id="lf-income" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview()">
         </div>
+        <div class="lfr-note-inline" id="income-note-area" style="display:none;">
+          <input class="lfr-note-input" id="lf-income-note" type="text" placeholder="备注（可选）">
+        </div>
       </div>
 
       <!-- 额外收入（USD 隐藏）-->
@@ -705,13 +709,6 @@ body{
         </div>
         <div class="lfr-note-inline">
           <input class="lfr-note-input" id="lf-extra-note" type="text" placeholder="备注（可选）">
-        </div>
-      </div>
-
-      <!-- 收入备注（USD 专用，ZMW 隐藏）-->
-      <div class="ledger-form-row" id="row-income-note" style="display:none;">
-        <div class="lfr-note-inline" style="padding:0 10px 10px 14px;">
-          <input class="lfr-note-input" id="lf-income-note" type="text" placeholder="收入备注（可选）">
         </div>
       </div>
 
@@ -727,12 +724,12 @@ body{
         </div>
       </div>
 
-      <!-- 昨日结余（USD 隐藏）-->
+      <!-- 昨日结余（自动带入，只读，ZMW/USD 通用）-->
       <div class="ledger-form-row" id="row-carry">
         <div class="lfr-main">
           <span class="lfr-label carry">↩ 昨日结余</span>
           <span class="lfr-prefix" id="pfx-carry">K</span>
-          <input class="lfr-input" id="lf-carry" type="number" inputmode="decimal" placeholder="自动带入" min="0" oninput="ledgerOnCarryInput()">
+          <input class="lfr-input" id="lf-carry" type="number" inputmode="decimal" placeholder="自动带入" min="0" readonly style="color:var(--muted);">
         </div>
         <div class="carry-source" id="carrySource"></div>
       </div>
@@ -748,11 +745,14 @@ body{
       </div>
       <!-- 导出面板 -->
       <div class="ledger-export-panel" id="ledgerExportPanel">
-        <div class="lep-label">选择月份导出 Excel</div>
+        <div class="lep-label">按月导出 Excel</div>
         <select class="lep-select" id="ledgerExportSelect">
           <option value="">— 选择月份 —</option>
         </select>
-        <button class="lep-go-btn" onclick="ledgerCopyToClipboard()">📋 复制数据到剪贴板</button>
+        <button class="lep-go-btn" onclick="ledgerExportXlsx('month')">📊 导出选中月份</button>
+        <div style="height:8px;"></div>
+        <button class="lep-go-btn lep-go-all" onclick="ledgerExportXlsx('all')">📦 导出全部历史</button>
+        <div class="lep-hint">导出后弹出系统菜单，选「存储到文件」可手动选择文件夹</div>
       </div>
       <div id="ledgerEntries"></div>
     </div>
@@ -1068,6 +1068,37 @@ function calcInjectValue(num){
 window.addEventListener('resize',function(){});/* reserved */
 paintCalc();
 
+/* ── 计算器键盘：touchstart 代理，消除 300ms 延迟 ── */
+(function(){
+  var keys=document.getElementById('calcKeys');
+  function dispatch(btn){
+    var act=btn.dataset.action;
+    if(act==='eq'){calcEq();return;}
+    var colon=act.indexOf(':');
+    var type=act.slice(0,colon), val=act.slice(colon+1);
+    if(type==='num') calcNum(val);
+    else if(type==='op') calcOp(val);
+    else if(type==='fn') calcFn(val);
+  }
+  keys.addEventListener('touchstart',function(e){
+    var btn=e.target.closest('[data-action]');
+    if(!btn) return;
+    e.preventDefault();
+    btn.classList.add('key-pressed');
+    dispatch(btn);
+  },{passive:false});
+  keys.addEventListener('touchend',function(e){
+    var btn=e.target.closest('[data-action]');
+    if(btn) setTimeout(function(){btn.classList.remove('key-pressed');},120);
+  },{passive:true});
+  /* 桌面 click fallback */
+  keys.addEventListener('click',function(e){
+    if(e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents) return;
+    var btn=e.target.closest('[data-action]');
+    if(btn) dispatch(btn);
+  });
+})();
+
 /* ══════════════════
    TAB 3 · 钱仓
 ══════════════════ */
@@ -1230,25 +1261,15 @@ function curSymbol(cur){ return cur==='USD'?'$':'K'; }
 
 /* ── 级联更新：修改某日后，重新计算所有后续日期的昨日结余 ── */
 function ledgerCascade(cur){
-  var isZMW=(cur||ledgerState.currency)==='ZMW';
   var data=loadLedgerAll(cur);
   var entries=data.entries||{};
   var keys=Object.keys(entries).sort(keyCompare);
-  if(isZMW){
-    /* ZMW: 级联昨日结余 */
-    for(var i=1;i<keys.length;i++){
-      var prevNet=entries[keys[i-1]].net;
-      entries[keys[i]].carry=prevNet;
-      var e=entries[keys[i]];
-      e.net=e.income+e.extra-e.expense+e.carry;
-    }
-  }else{
-    /* USD: 无级联，每天独立 net = income - expense */
-    keys.forEach(function(k){
-      var e=entries[k];
-      e.carry=0;
-      e.net=e.income-e.expense;
-    });
+  /* 统一公式：当日结余 = 收入(income) + 额外收入(extra,USD恒为0) - 支出 + 昨日结余 */
+  for(var i=0;i<keys.length;i++){
+    var e=entries[keys[i]];
+    if(i>0) e.carry=entries[keys[i-1]].net;
+    else if(e.carry===undefined) e.carry=0;
+    e.net=(e.income||0)+(e.extra||0)-(e.expense||0)+(e.carry||0);
   }
   data.entries=entries;
   saveLedgerAll(data,cur);
@@ -1281,15 +1302,15 @@ function ledgerUpdateCurrencyUI(){
     var el=document.getElementById('pfx-'+f);
     if(el) el.textContent=sym;
   });
-  /* ZMW：营业额+额外收入+支出+昨日结余；USD：收入+收入备注+支出+支出备注 */
+  /* ZMW：营业额+额外收入+支出+昨日结余；USD：收入(含备注)+支出+昨日结余 */
   document.getElementById('label-income').textContent=isZMW?'📈 营业额':'💵 收入';
   document.getElementById('row-extra').style.display=isZMW?'':'none';
-  document.getElementById('row-income-note').style.display=isZMW?'none':'';
-  document.getElementById('row-carry').style.display=isZMW?'':'none';
+  document.getElementById('income-note-area').style.display=isZMW?'none':'';
+  document.getElementById('row-carry').style.display='';
   /* 结余卡公式说明 */
   document.getElementById('ledgerNetFormula').textContent=isZMW
     ?'营业额 + 额外收入 − 支出 + 昨日结余'
-    :'收入 − 支出';
+    :'收入 − 支出 + 昨日结余';
   var nc=document.getElementById('ledgerNetCard');
   nc.className='ledger-net-card '+(isZMW?'zmw':'usd');
   var btn=document.getElementById('ledgerCommitBtn');
@@ -1363,30 +1384,24 @@ function ledgerLoadDateIntoForm(k){
   var incNoteEl=document.getElementById('lf-income-note');
   if(incNoteEl) incNoteEl.value=e&&e.incomeNote?e.incomeNote:'';
 
-  /* 昨日结余（仅 ZMW）*/
+  /* 昨日结余：自动带入（ZMW/USD 通用）*/
   var carryInput=document.getElementById('lf-carry');
   var carrySourceEl=document.getElementById('carrySource');
-  if(isZMW){
-    if(e){
-      carryInput.value=e.carry!==undefined?e.carry:'';
-      carrySourceEl.className='carry-source';
-      carrySourceEl.textContent='';
-    }else{
-      var prevKey=ledgerFindPrevKey(k);
-      if(prevKey&&entries[prevKey]!==undefined){
-        carryInput.value=entries[prevKey].net;
-        carrySourceEl.className='carry-source show';
-        carrySourceEl.textContent='自动带入：'+keyToLabel(prevKey)+' 结余 '+curSymbol(ledgerState.currency)+' '+fmt(entries[prevKey].net);
-      }else{
-        carryInput.value='';
-        carrySourceEl.className='carry-source';
-        carrySourceEl.textContent='';
-      }
-    }
-  }else{
-    carryInput.value='';
+  if(e){
+    carryInput.value=e.carry!==undefined?e.carry:'';
     carrySourceEl.className='carry-source';
     carrySourceEl.textContent='';
+  }else{
+    var prevKey=ledgerFindPrevKey(k);
+    if(prevKey&&entries[prevKey]!==undefined){
+      carryInput.value=entries[prevKey].net;
+      carrySourceEl.className='carry-source show';
+      carrySourceEl.textContent='自动带入：'+keyToLabel(prevKey)+' 结余 '+curSymbol(ledgerState.currency)+' '+fmt(entries[prevKey].net);
+    }else{
+      carryInput.value='';
+      carrySourceEl.className='carry-source';
+      carrySourceEl.textContent='';
+    }
   }
   ledgerState.carryManual=false;
   ledgerPreview();
@@ -1402,26 +1417,14 @@ function ledgerFindPrevKey(k){
   return keys[keys.length-1];
 }
 
-/* ── 用户手动修改昨日结余 ── */
-function ledgerOnCarryInput(){
-  ledgerState.carryManual=true;
-  document.getElementById('carrySource').className='carry-source'; /* 隐藏自动提示 */
-  ledgerPreview();
-}
-
 /* ── 实时预览 ── */
 function ledgerPreview(){
   var isZMW=ledgerState.currency==='ZMW';
   var income=parseFloat(document.getElementById('lf-income').value)||0;
   var expense=parseFloat(document.getElementById('lf-expense').value)||0;
-  var net;
-  if(isZMW){
-    var extra=parseFloat(document.getElementById('lf-extra').value)||0;
-    var carry=parseFloat(document.getElementById('lf-carry').value)||0;
-    net=income+extra-expense+carry;
-  }else{
-    net=income-expense;
-  }
+  var carry=parseFloat(document.getElementById('lf-carry').value)||0;
+  var extra=isZMW?(parseFloat(document.getElementById('lf-extra').value)||0):0;
+  var net=income+extra-expense+carry;
   var sym=curSymbol(ledgerState.currency);
   var valEl=document.getElementById('ledgerNetVal');
   valEl.textContent=(net<0?'−':'')+sym+' '+fmt(Math.abs(net));
@@ -1436,16 +1439,15 @@ function ledgerCommit(){
   var income=parseFloat(document.getElementById('lf-income').value)||0;
   var expense=parseFloat(document.getElementById('lf-expense').value)||0;
   var expenseNote=document.getElementById('lf-expense-note').value.trim();
-  var extra=0,carry=0,extraNote='',incomeNote='',net=0;
+  var carry=parseFloat(document.getElementById('lf-carry').value)||0;
+  var extra=0,extraNote='',incomeNote='';
   if(isZMW){
     extra=parseFloat(document.getElementById('lf-extra').value)||0;
-    carry=parseFloat(document.getElementById('lf-carry').value)||0;
     extraNote=document.getElementById('lf-extra-note').value.trim();
-    net=income+extra-expense+carry;
   }else{
     incomeNote=document.getElementById('lf-income-note').value.trim();
-    net=income-expense;
   }
+  var net=income+extra-expense+carry;
   var data=loadLedgerAll();
   if(!data.entries) data.entries={};
   var existed=!!data.entries[k];
@@ -1536,14 +1538,30 @@ function ledgerRenderHistory(){
     yHead.onclick=function(){
       var open=yBody.classList.toggle('open');
       yHead.querySelector('.lh-group-year-chevron').style.transform=open?'rotate(180deg)':'';
+      if(!open){
+        /* 收起年份时，同步收起内部所有月份和日详情 */
+        yBody.querySelectorAll('.lh-group-month-body.open').forEach(function(mb){
+          mb.classList.remove('open');
+          var mh=mb.previousElementSibling;
+          if(mh){
+            var chev=mh.querySelector('.lh-group-month-chevron');
+            if(chev) chev.style.transform='rotate(-90deg)';
+          }
+        });
+        yBody.querySelectorAll('.ldc-body.open').forEach(function(body){
+          body.classList.remove('open');
+          var head=body.previousElementSibling;
+          if(head){
+            var chev=head.querySelector('.ldc-chevron');
+            if(chev) chev.style.transform='';
+          }
+        });
+      }
     };
     if(y!==thisYear) yHead.querySelector('.lh-group-year-chevron').style.transform='rotate(-90deg)';
 
     Object.keys(tree[y]).sort(function(a,b){return b-a;}).forEach(function(m){
       var mKeys=tree[y][m];
-      var mNet=mKeys.reduce(function(s,k){return s+(entries[k].net||0);},0);
-      var mNetSign=mNet>=0?'+':'−';
-      var mNetCls=cur==='ZMW'?(mNet>=0?'pos':'neg'):(mNet>=0?'pos-usd':'neg');
 
       var mDiv=document.createElement('div');
       mDiv.className='lh-group-month';
@@ -1553,7 +1571,6 @@ function ledgerRenderHistory(){
       mHead.innerHTML=
         '<span class="lh-group-month-label">'+monthNames[parseInt(m)]+'</span>'+
         '<div class="lh-group-month-right">'+
-          '<span class="lh-group-month-net ldc-head-net '+mNetCls+'">'+mNetSign+sym+' '+fmt(Math.abs(mNet))+'</span>'+
           '<span class="lh-group-month-chevron">▾</span>'+
         '</div>';
 
@@ -1565,6 +1582,17 @@ function ledgerRenderHistory(){
       mHead.onclick=function(){
         var open=mBody.classList.toggle('open');
         mHead.querySelector('.lh-group-month-chevron').style.transform=open?'rotate(180deg)':'rotate(-90deg)';
+        if(!open){
+          /* 收起月份时，同步收起内部所有展开的日详情 */
+          mBody.querySelectorAll('.ldc-body.open').forEach(function(body){
+            body.classList.remove('open');
+            var head=body.previousElementSibling;
+            if(head){
+              var chev=head.querySelector('.ldc-chevron');
+              if(chev) chev.style.transform='';
+            }
+          });
+        }
       };
 
       mKeys.forEach(function(k){
@@ -1593,7 +1621,8 @@ function ledgerRenderHistory(){
               '<div class="ldc-body-row"><span class="ldb-label">↩ 昨日结余</span><div class="ldb-right"><span class="ldb-val carry">'+sym+' '+fmt(e.carry)+'</span></div></div>'
             :
               '<div class="ldc-body-row"><span class="ldb-label">💵 收入</span><div class="ldb-right"><span class="ldb-val inc">'+sym+' '+fmt(e.income)+'</span>'+(e.incomeNote?'<span class="ldb-note">'+escHtml(e.incomeNote)+'</span>':'')+'</div></div>'+
-              '<div class="ldc-body-row"><span class="ldb-label">📉 支出</span><div class="ldb-right"><span class="ldb-val exp">−'+sym+' '+fmt(e.expense)+'</span>'+(e.expenseNote?'<span class="ldb-note">'+escHtml(e.expenseNote)+'</span>':'')+'</div></div>'
+              '<div class="ldc-body-row"><span class="ldb-label">📉 支出</span><div class="ldb-right"><span class="ldb-val exp">−'+sym+' '+fmt(e.expense)+'</span>'+(e.expenseNote?'<span class="ldb-note">'+escHtml(e.expenseNote)+'</span>':'')+'</div></div>'+
+              '<div class="ldc-body-row"><span class="ldb-label">↩ 昨日结余</span><div class="ldb-right"><span class="ldb-val carry">'+sym+' '+fmt(e.carry)+'</span></div></div>'
             )+
             '<div class="ldc-body-edit">'+
               '<button class="ldc-del-btn" onclick="ledgerDeleteEntry(\''+k+'\')">删除</button>'+
@@ -1646,48 +1675,288 @@ function ledgerUpdateExportSelect(entries){
 }
 
 function ledgerExportSelected(){
-  ledgerCopyToClipboard();
+  ledgerExportXlsx('month');
 }
 
-function ledgerCopyToClipboard(){
-  var sel=document.getElementById('ledgerExportSelect');
-  if(!sel.value){showToast('请先选择月份');return;}
-  var parts=sel.value.split('_');
-  var year=parts[0],month=parts[1];
-  var cur=ledgerState.currency;
+/* ══════════════════════════════════════
+   原生 XLSX 生成 + 系统分享
+   无需外部库，离线可用
+══════════════════════════════════════ */
+
+/* CRC32 表（用于 ZIP）*/
+var _crcTable=null;
+function crc32(bytes){
+  if(!_crcTable){
+    _crcTable=[];
+    for(var n=0;n<256;n++){
+      var c=n;
+      for(var k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);
+      _crcTable[n]=c>>>0;
+    }
+  }
+  var crc=0xFFFFFFFF;
+  for(var i=0;i<bytes.length;i++) crc=(crc>>>8)^_crcTable[(crc^bytes[i])&0xFF];
+  return (crc^0xFFFFFFFF)>>>0;
+}
+function strToU8(s){
+  return new TextEncoder().encode(s);
+}
+/* 最小 ZIP 写入器（store 模式，无压缩）*/
+function zipFiles(files){
+  /* files: [{name, data(Uint8Array)}] */
+  var chunks=[],central=[],offset=0;
+  function u16(n){return [n&0xFF,(n>>8)&0xFF];}
+  function u32(n){return [n&0xFF,(n>>8)&0xFF,(n>>16)&0xFF,(n>>24)&0xFF];}
+  files.forEach(function(f){
+    var nameBytes=strToU8(f.name);
+    var crc=crc32(f.data);
+    var size=f.data.length;
+    var local=[].concat(
+      u32(0x04034b50),u16(20),u16(0),u16(0),u16(0),u16(0),
+      u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0)
+    );
+    chunks.push(new Uint8Array(local));
+    chunks.push(nameBytes);
+    chunks.push(f.data);
+    var cd=[].concat(
+      u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),
+      u32(crc),u32(size),u32(size),u16(nameBytes.length),
+      u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset)
+    );
+    central.push(new Uint8Array(cd));
+    central.push(nameBytes);
+    offset+=local.length+nameBytes.length+size;
+  });
+  var centralStart=offset;
+  var centralSize=0;
+  central.forEach(function(c){centralSize+=c.length;});
+  var end=[].concat(
+    u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),
+    u32(centralSize),u32(centralStart),u16(0)
+  );
+  var all=chunks.concat(central).concat([new Uint8Array(end)]);
+  var total=0;all.forEach(function(a){total+=a.length;});
+  var out=new Uint8Array(total),pos=0;
+  all.forEach(function(a){out.set(a,pos);pos+=a.length;});
+  return out;
+}
+
+function xlsxEsc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+/* 单元格：t=数字时为数值，否则 inlineStr */
+function xlsxCell(ref,val,isNum,styleIdx){
+  var s=styleIdx?(' s="'+styleIdx+'"'):'';
+  if(isNum){
+    return '<c r="'+ref+'"'+s+'><v>'+val+'</v></c>';
+  }
+  return '<c r="'+ref+'"'+s+' t="inlineStr"><is><t xml:space="preserve">'+xlsxEsc(val)+'</t></is></c>';
+}
+function colLetter(n){ /* 1->A */
+  var s='';
+  while(n>0){var m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}
+  return s;
+}
+
+/* 把一个 sheet 的二维数组转 worksheet xml
+   rows: [[{v,num,style}...]...] */
+function buildSheetXml(rows){
+  var body='';
+  for(var r=0;r<rows.length;r++){
+    var cells=rows[r];
+    var rowXml='<row r="'+(r+1)+'">';
+    for(var c=0;c<cells.length;c++){
+      var cell=cells[c];
+      if(cell===null||cell===undefined) continue;
+      var ref=colLetter(c+1)+(r+1);
+      rowXml+=xlsxCell(ref,cell.v,cell.num,cell.style);
+    }
+    rowXml+='</row>';
+    body+=rowXml;
+  }
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<sheetData>'+body+'</sheetData></worksheet>';
+}
+
+/* 构建完整 xlsx，sheets: [{name, rows}] */
+function buildXlsx(sheets){
+  var files=[];
+  /* [Content_Types].xml */
+  var ctOverrides='';
+  sheets.forEach(function(s,i){
+    ctOverrides+='<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+  });
+  files.push({name:'[Content_Types].xml',data:strToU8(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+    '<Default Extension="xml" ContentType="application/xml"/>'+
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+    ctOverrides+'</Types>'
+  )});
+  /* _rels/.rels */
+  files.push({name:'_rels/.rels',data:strToU8(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'+
+    '</Relationships>'
+  )});
+  /* xl/workbook.xml */
+  var sheetTags='',wbRels='';
+  sheets.forEach(function(s,i){
+    sheetTags+='<sheet name="'+xlsxEsc(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>';
+    wbRels+='<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>';
+  });
+  var stylesRid='rId'+(sheets.length+1);
+  wbRels+='<Relationship Id="'+stylesRid+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
+  files.push({name:'xl/workbook.xml',data:strToU8(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '+
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+    '<sheets>'+sheetTags+'</sheets></workbook>'
+  )});
+  /* xl/_rels/workbook.xml.rels */
+  files.push({name:'xl/_rels/workbook.xml.rels',data:strToU8(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    wbRels+'</Relationships>'
+  )});
+  /* xl/styles.xml — 样式：0默认 1粗体 2标题(粗大) */
+  files.push({name:'xl/styles.xml',data:strToU8(
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<fonts count="3">'+
+    '<font><sz val="11"/><name val="Calibri"/></font>'+
+    '<font><b/><sz val="11"/><name val="Calibri"/></font>'+
+    '<font><b/><sz val="14"/><name val="Calibri"/></font>'+
+    '</fonts>'+
+    '<fills count="3"><fill><patternFill patternType="none"/></fill>'+
+    '<fill><patternFill patternType="gray125"/></fill>'+
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF22263A"/></patternFill></fill>'+
+    '</fills>'+
+    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'+
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+    '<cellXfs count="3">'+
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+    '</cellXfs>'+
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
+    '</styleSheet>'
+  )});
+  /* worksheets */
+  sheets.forEach(function(s,i){
+    files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:strToU8(buildSheetXml(s.rows))});
+  });
+  return zipFiles(files);
+}
+
+/* 把某个币种、某些日期 key 的数据转成 sheet rows */
+function ledgerBuildRows(cur,keys,entries){
   var isZMW=cur==='ZMW';
-  var data=loadLedgerAll();
-  var entries=data.entries||{};
-  var keys=Object.keys(entries).filter(function(k){
-    var p=k.split('-');return p[0]===year&&p[1]===month;
-  }).sort(keyCompare);
-  if(!keys.length){showToast('该月无数据');return;}
-  var lines=[];
+  var rows=[];
+  /* 表头 */
+  if(isZMW){
+    rows.push([
+      {v:'日期'},{v:'营业额'},{v:'额外收入'},{v:'支出'},
+      {v:'昨日结余'},{v:'当日结余'},{v:'额外收入备注'},{v:'支出备注'}
+    ].map(function(c){c.style=1;return c;}));
+  }else{
+    rows.push([
+      {v:'日期'},{v:'收入'},{v:'支出'},
+      {v:'昨日结余'},{v:'当日结余'},{v:'收入备注'},{v:'支出备注'}
+    ].map(function(c){c.style=1;return c;}));
+  }
+  var wd=['日','一','二','三','四','五','六'];
+  var sumIncome=0,sumExtra=0,sumExpense=0,lastNet=0;
   keys.forEach(function(k){
     var e=entries[k];var p=k.split('-');
+    var d=keyToDate(k);
+    var dateStr=p[0]+'-'+p[1]+'-'+p[2]+'(周'+wd[d.getDay()]+')';
+    sumIncome+=e.income||0;sumExtra+=e.extra||0;sumExpense+=e.expense||0;lastNet=e.net||0;
     if(isZMW){
-      lines.push([p[0]+'-'+p[1]+'-'+p[2],
-        e.income||0,e.extra||0,e.expense||0,e.carry||0,e.net||0,
-        csvQ(e.extraNote||''),csvQ(e.expenseNote||'')].join(','));
+      rows.push([
+        {v:dateStr},{v:e.income||0,num:true},{v:e.extra||0,num:true},
+        {v:e.expense||0,num:true},{v:e.carry||0,num:true},{v:e.net||0,num:true},
+        {v:e.extraNote||''},{v:e.expenseNote||''}
+      ]);
     }else{
-      lines.push([p[0]+'-'+p[1]+'-'+p[2],
-        e.income||0,e.expense||0,e.net||0,
-        csvQ(e.incomeNote||''),csvQ(e.expenseNote||'')].join(','));
+      rows.push([
+        {v:dateStr},{v:e.income||0,num:true},{v:e.expense||0,num:true},
+        {v:e.carry||0,num:true},{v:e.net||0,num:true},
+        {v:e.incomeNote||''},{v:e.expenseNote||''}
+      ]);
     }
   });
-  var csv=lines.join('\n');
+  /* 合计行 */
+  if(isZMW){
+    rows.push([
+      {v:'月合计',style:1},{v:sumIncome,num:true,style:1},{v:sumExtra,num:true,style:1},
+      {v:sumExpense,num:true,style:1},{v:''},{v:lastNet,num:true,style:1},{v:''},{v:''}
+    ]);
+  }else{
+    rows.push([
+      {v:'月合计',style:1},{v:sumIncome,num:true,style:1},{v:sumExpense,num:true,style:1},
+      {v:''},{v:lastNet,num:true,style:1},{v:''},{v:''}
+    ]);
+  }
+  return rows;
+}
+
+/* 主导出函数 mode='month'|'all' */
+function ledgerExportXlsx(mode){
+  var cur=ledgerState.currency;
+  var data=loadLedgerAll();
+  var entries=data.entries||{};
+  var allKeys=Object.keys(entries).sort(keyCompare);
+  if(!allKeys.length){showToast('暂无数据可导出');return;}
+
   var monthNames=['','一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-  var label=year+'年'+monthNames[parseInt(month)]+' · '+keys.length+'条';
-  navigator.clipboard.writeText(csv).then(function(){
-    showToast('✓ '+label+' 已复制，粘贴到 Excel 模板即可');
-  }).catch(function(){
-    var ta=document.createElement('textarea');
-    ta.value=csv;
-    ta.style.cssText='position:fixed;top:15%;left:4%;width:92%;height:45%;z-index:9999;font-size:11px;padding:10px;background:#1a1d27;color:#f0f2ff;border:2px solid #f5a623;border-radius:12px;';
-    document.body.appendChild(ta);ta.focus();ta.select();
-    showToast('请全选复制上方文本，8秒后关闭');
-    setTimeout(function(){if(ta.parentNode)ta.parentNode.removeChild(ta);},8000);
-  });
+  var sheets=[],fileName='';
+
+  if(mode==='month'){
+    var sel=document.getElementById('ledgerExportSelect');
+    if(!sel.value){showToast('请先选择月份');return;}
+    var parts=sel.value.split('_');
+    var year=parts[0],month=parts[1];
+    var keys=allKeys.filter(function(k){
+      var p=k.split('-');return p[0]===year&&p[1]===month;
+    });
+    if(!keys.length){showToast('该月无数据');return;}
+    sheets.push({name:year+'年'+month+'月',rows:ledgerBuildRows(cur,keys,entries)});
+    fileName=year+'年'+month+'月现金流水账_'+cur+'.xlsx';
+  }else{
+    /* all: 每个月一个 sheet */
+    var byMonth={};
+    allKeys.forEach(function(k){
+      var p=k.split('-');var ym=p[0]+'-'+p[1];
+      if(!byMonth[ym])byMonth[ym]=[];
+      byMonth[ym].push(k);
+    });
+    Object.keys(byMonth).sort().forEach(function(ym){
+      var p=ym.split('-');
+      sheets.push({name:p[0]+'年'+p[1]+'月',rows:ledgerBuildRows(cur,byMonth[ym],entries)});
+    });
+    var firstK=allKeys[0].split('-'),lastK=allKeys[allKeys.length-1].split('-');
+    fileName='现金流水账全部历史_'+cur+'.xlsx';
+  }
+
+  var xlsxBytes=buildXlsx(sheets);
+  var blob=new Blob([xlsxBytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var file=new File([blob],fileName,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+
+  /* 优先系统分享（可选存文件夹/AirDrop）*/
+  if(navigator.share){
+    navigator.share({files:[file],title:fileName})
+      .then(function(){showToast('导出成功');})
+      .catch(function(err){
+        if(err.name!=='AbortError') ledgerFallbackDownload(blob,fileName);
+      });
+  }else{
+    ledgerFallbackDownload(blob,fileName);
+  }
 }
 
 function ledgerFallbackDownload(blob,fileName){

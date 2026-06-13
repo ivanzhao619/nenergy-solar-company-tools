@@ -448,6 +448,11 @@ body{
 .ledger-commit-btn.zmw{background:linear-gradient(135deg,#2a5a2a,#3a7a3a);color:#c8f5a0;}
 .ledger-commit-btn.usd{background:linear-gradient(135deg,#1a4a8a,#2a6acc);color:#c8e0ff;}
 .ledger-commit-btn:active{opacity:0.78;}
+.ledger-commit-btn:disabled{
+  background:var(--surface)!important;color:var(--muted)!important;
+  cursor:default;opacity:1;border:1.5px solid var(--border);
+}
+.ledger-commit-btn:disabled:active{opacity:1;}
 
 /* 历史 */
 .ledger-history{padding:10px 13px 10px;}
@@ -756,10 +761,10 @@ body{
         <div class="lfr-main">
           <span class="lfr-label income" id="label-income">📈 营业额</span>
           <span class="lfr-prefix" id="pfx-income">K</span>
-          <input class="lfr-input" id="lf-income" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview()">
+          <input class="lfr-input" id="lf-income" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview();ledgerMarkDirty()">
         </div>
         <div class="lfr-note-inline" id="income-note-area" style="display:none;">
-          <input class="lfr-note-input" id="lf-income-note" type="text" placeholder="备注（可选）">
+          <input class="lfr-note-input" id="lf-income-note" type="text" placeholder="备注（可选）" oninput="ledgerMarkDirty()">
         </div>
       </div>
 
@@ -768,10 +773,10 @@ body{
         <div class="lfr-main">
           <span class="lfr-label extra">⚡ 额外收入</span>
           <span class="lfr-prefix" id="pfx-extra">K</span>
-          <input class="lfr-input" id="lf-extra" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview()">
+          <input class="lfr-input" id="lf-extra" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview();ledgerMarkDirty()">
         </div>
         <div class="lfr-note-inline">
-          <input class="lfr-note-input" id="lf-extra-note" type="text" placeholder="备注（可选）">
+          <input class="lfr-note-input" id="lf-extra-note" type="text" placeholder="备注（可选）" oninput="ledgerMarkDirty()">
         </div>
       </div>
 
@@ -780,10 +785,10 @@ body{
         <div class="lfr-main">
           <span class="lfr-label expense">📉 支出</span>
           <span class="lfr-prefix" id="pfx-expense">K</span>
-          <input class="lfr-input" id="lf-expense" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview()">
+          <input class="lfr-input" id="lf-expense" type="number" inputmode="decimal" placeholder="0" min="0" oninput="ledgerPreview();ledgerMarkDirty()">
         </div>
         <div class="lfr-note-inline">
-          <input class="lfr-note-input" id="lf-expense-note" type="text" placeholder="备注（可选）">
+          <input class="lfr-note-input" id="lf-expense-note" type="text" placeholder="备注（可选）" oninput="ledgerMarkDirty()">
         </div>
       </div>
 
@@ -1548,6 +1553,27 @@ function ledgerLoadDateIntoForm(k){
   }
   ledgerState.carryManual=false;
   ledgerPreview();
+  ledgerSetCommitState(!!e);
+}
+
+/* ── 记录按钮状态机 ──
+   committed=true  → 灰色禁用，显示「✅ 已记录」
+   committed=false → 正常可点，显示「📝 记录账目」 */
+function ledgerSetCommitState(committed){
+  var btn=document.getElementById('ledgerCommitBtn');
+  if(!btn) return;
+  if(committed){
+    btn.disabled=true;
+    btn.textContent='✅ 已记录';
+  }else{
+    btn.disabled=false;
+    btn.textContent='📝 记录账目';
+  }
+}
+
+/* 任意输入框变动 → 重新激活记录按钮 */
+function ledgerMarkDirty(){
+  ledgerSetCommitState(false);
 }
 
 function ledgerFindPrevKey(k){
@@ -1579,37 +1605,22 @@ function ledgerPreview(){
 function ledgerCommit(){
   var k=ledgerState.dateKey;
   var isZMW=ledgerState.currency==='ZMW';
-  /* 读取原始输入字符串，判断是否真的有输入（区分"空"和"0"）*/
-  var incomeStr=document.getElementById('lf-income').value.trim();
-  var expenseStr=document.getElementById('lf-expense').value.trim();
-  var extraStr=isZMW?document.getElementById('lf-extra').value.trim():'';
-  var income=parseFloat(incomeStr)||0;
-  var expense=parseFloat(expenseStr)||0;
+  var income=parseFloat(document.getElementById('lf-income').value)||0;
+  var expense=parseFloat(document.getElementById('lf-expense').value)||0;
   var expenseNote=document.getElementById('lf-expense-note').value.trim();
   var carry=parseFloat(document.getElementById('lf-carry').value)||0;
   var extra=0,extraNote='',incomeNote='';
   if(isZMW){
-    extra=parseFloat(extraStr)||0;
+    extra=parseFloat(document.getElementById('lf-extra').value)||0;
     extraNote=document.getElementById('lf-extra-note').value.trim();
   }else{
     incomeNote=document.getElementById('lf-income-note').value.trim();
   }
 
-  /* 防重复提交：输入框全空时，若该日已有记录则提示已提交，不覆盖 */
-  var noInput=(incomeStr===''&&expenseStr===''&&extraStr===''&&!extraNote&&!expenseNote&&!incomeNote);
+  var net=income+extra-expense+carry;
   var data=loadLedgerAll();
   if(!data.entries) data.entries={};
   var existed=!!data.entries[k];
-  if(noInput&&existed){
-    showToast('账目已提交');
-    return;
-  }
-  if(noInput&&!existed){
-    showToast('请先输入金额');
-    return;
-  }
-
-  var net=income+extra-expense+carry;
   data.entries[k]={
     income:income,extra:extra,expense:expense,carry:carry,net:net,
     extraNote:extraNote,expenseNote:expenseNote,incomeNote:incomeNote,
@@ -1620,19 +1631,7 @@ function ledgerCommit(){
   showToast(existed?'账目已更新':'账目已记录');
   ledgerRenderHistory();
   ledgerPreview();
-  if(k===todayKey()){
-    ['income','extra','expense'].forEach(function(f){
-      document.getElementById('lf-'+f).value='';
-    });
-    ['extra','expense'].forEach(function(f){
-      var noteEl=document.getElementById('lf-'+f+'-note');
-      if(noteEl) noteEl.value='';
-    });
-    var incNoteEl=document.getElementById('lf-income-note');
-    if(incNoteEl) incNoteEl.value='';
-    ledgerState.carryManual=false;
-    ledgerPreview();
-  }
+  ledgerSetCommitState(true);
 }
 
 /* ── 删除 ── */
